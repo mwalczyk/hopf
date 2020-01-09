@@ -19,6 +19,7 @@ include_directories("${PROJECT_SOURCE_DIR}/include")
 include_directories("${PROJECT_SOURCE_DIR}/external/glfw/include/GLFW")
 include_directories("${PROJECT_SOURCE_DIR}/external/imgui/include")
 include_directories("${PROJECT_SOURCE_DIR}/external/glad/include")
+include_directories("${PROJECT_SOURCE_DIR}/external/glm/glm")
 file(GLOB PROJECT_HEADERS "include/*.h")
 
 # include source files
