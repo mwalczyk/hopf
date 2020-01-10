@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <vector>
 
-//#define GLM_FORCE_RADIANS
+#define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm.hpp"
 #include "gtc/constants.hpp"
@@ -129,7 +129,7 @@ public:
 		generate_fibration();
 	}
 
-	void generate_fibration(size_t iterations_per_fiber = 120)
+	void generate_fibration(size_t iterations_per_fiber = 130)
 	{
 		auto thetas = linear_spacing(0.0f, glm::two_pi<float>(), iterations_per_fiber);
 		std::vector<Vertex> vertices;
@@ -138,6 +138,10 @@ public:
 		for (size_t i = 0; i < base_points.size(); ++i)
 		{
 			const auto point = base_points[i];
+			float a = point.position.x;
+			float b = point.position.y;
+			float c = point.position.z;
+			float coeff = 1.0f / sqrtf(2.0f * (1.0f + c));
 
 			// Every `steps` points (in 4-space) form a single fiber of the Hopf fibration
 			std::vector<glm::vec3> path;
@@ -146,17 +150,12 @@ public:
 			{
 				float theta = thetas[j];
 
-				float a = point.position.x;
-				float b = point.position.y;
-				float c = point.position.z;
-				float coeff = 1.0f / sqrtf(2.0f * (1.0f + c));
-
 				// Points in 4-space: a rotation by the quaternion <x, y, z, w> would send the
 				// point <0, 0, 1> on S2 to the point <a, b, c> - thus, each base point sweeps
 				// out a great circle ("fiber") on S2
 				const float w = coeff * (1.0f + c) * cosf(theta);
-				const float x = coeff * a * sinf(theta) - b * cosf(theta);
-				const float y = coeff * a * cosf(theta) + b * sinf(theta);
+				const float x = coeff * (a * sinf(theta) - b * cosf(theta));
+				const float y = coeff * (a * cosf(theta) + b * sinf(theta));
 				const float z = coeff * (1.0f + c) * sinf(theta);
 
 				// Modified stereographic projection onto the unit ball in 3-space from:
@@ -164,24 +163,23 @@ public:
 				const float r = acosf(w) / glm::pi<float>();
 				const float projection = r / sqrtf(1.0f - w * w);
 
-				Vertex v;
-				v.position = glm::vec3{ 
+				Vertex vertex;
+				vertex.position = glm::vec3{
 					projection * x,
 					projection * y,
 					projection * z
 				};
-				v.color = glm::vec3{
+				vertex.color = glm::vec3{
 					a * 0.5f + 0.5f,
 					b * 0.5f + 0.5f,
 					c * 0.5f + 0.5f
 				};
-				v.texture_coordinate = glm::vec2{ 
+				vertex.texture_coordinate = glm::vec2{
 					0.0f, // Unused, at the moment
 					0.0f 
 				};
-				//path.push_back(v.position);
 
-				vertices.push_back(v);
+				vertices.push_back(vertex);
 				indices.push_back(j + iterations_per_fiber * i);
 			}
 
@@ -195,7 +193,7 @@ public:
 			//vertices.insert(std::end(vertices), std::begin(tube_vertices), std::end(tube_vertices));
 
 		}
-		std::cout << "Generated fibration with " << vertices.size() << " vertices and " << indices.size() << " indices\n";
+		//std::cout << "Generated fibration with " << vertices.size() << " vertices and " << indices.size() << " indices\n";
 
 		mesh = Mesh{ vertices, indices };
 	}

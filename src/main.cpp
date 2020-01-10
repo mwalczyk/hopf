@@ -1,4 +1,5 @@
-#include <iostream>
+﻿#include <iostream>
+#include <random>
 
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
@@ -14,11 +15,41 @@
 
 // References:
 // [1](https://github.com/fendevel/Guide-to-Modern-OpenGL-Functions#glframebuffer)
+// [2](https://en.wikibooks.org/wiki/OpenGL_Programming/Modern_OpenGL_Tutorial_Arcball)
 
-float theta = 0.0f;
-float psi = 0.0f;
-glm::vec3 camera_position = glm::vec3(0.0f, 1.0f, 3.0f);
-glm::vec3 camera_up = glm::vec3(0.0f, 1.0f, 0.0f);
+// Data that will be associated with the GLFW window
+struct InputData
+{
+    bool imgui_active = false;
+};
+
+const uint32_t window_w = 1080;
+const uint32_t window_h = 1080;
+const uint32_t ui_w = 256;
+const uint32_t ui_h = 256;
+bool first_mouse = true;
+float last_x;
+float last_y;
+glm::mat4 arcball_camera_matrix = glm::lookAt(glm::vec3{ 0.0f, 1.0f, 6.0f }, glm::vec3{ 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
+glm::mat4 arcball_model_matrix = glm::mat4{ 1.0f };
+
+// Values affected by the GUI
+ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+uint32_t number_of_circles = 1;     // For mode: "Great Circle"
+std::vector<float> offsets = { 0.0f };// For mode: "Great Circle"
+std::vector<float> arc_angles = { glm::two_pi<float>() }; // For mode: "Great Circle"
+float rotation_x = 0.0f;            // For mode: "Great Circle"
+float rotation_y = 0.0f;            // For mode: "Great Circle"
+float rotation_z = 0.0f;            // For mode: "Great Circle"
+uint32_t seed = 0.0f;               // For mode: "Random"
+float mean = 0.0f;                  // For mode: "Random"
+float standard_deviation = 1.0f;    // For mode: "Random"
+size_t number_of_fibers = 40;
+
+const char* modes[] = { "Great Circle", "Random" };
+std::string current_mode = modes[0];
+
+InputData input_data;
 
 void process_input(GLFWwindow* window)
 {
@@ -26,35 +57,88 @@ void process_input(GLFWwindow* window)
     {
         glfwSetWindowShouldClose(window, true);
     }
-
-    const float speed = 0.025f; // adjust accordingly
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        psi += speed;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        psi -= speed;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        theta += speed;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        theta -= speed;
-
-    theta = std::min(glm::pi<float>(), theta);
-    theta = std::max(0.0f, theta);
-
-    psi = std::min(glm::two_pi<float>(), psi);
-    psi = std::max(0.0f, psi);
-    
-    camera_position = glm::vec3{
-        sinf(theta) * cosf(psi),
-        sinf(theta) * sinf(psi),
-        cosf(theta)
-    } * 3.0f;
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+/**
+ * Get a normalized vector from the center of the virtual ball `O` to a
+ * point `P` on the virtual ball surface, such that `P` is aligned on
+ * screen's (X, Y) coordinates.  If (X, Y) is too far away from the
+ * sphere, return the nearest point on the virtual ball surface.
+ */
+glm::vec3 get_arcball_vector(int x, int y) 
 {
-    glViewport(0, 0, width, height);
+    glm::vec3 P = glm::vec3(
+        1.0 * x / window_w * 2.0f - 1.0f,
+        1.0 * y / window_h * 2.0f - 1.0f,
+        0.0f
+    );
+
+    P.y = -P.y;
+
+    float op_squared = P.x * P.x + P.y * P.y;
+
+    if (op_squared <= 1.0f * 1.0f)
+    {
+        // Pythagorean theorem
+        P.z = sqrt(1.0f * 1.0f - op_squared);  
+    }
+    else
+    {
+        // Nearest point
+        P = glm::normalize(P);  
+    }
+
+    return P;
 }
 
+/**
+ * Performs arcball camera calculations.
+ */
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    // First, check if the user is interacting with the ImGui interface - if they are,
+    // we don't want to process mouse events any further
+    auto input_data = static_cast<InputData*>(glfwGetWindowUserPointer(window));
+
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !input_data->imgui_active)
+    {
+        if (first_mouse)
+        {
+            last_x = xpos;
+            last_y = ypos;
+            first_mouse = false;
+        }
+
+        if (xpos != last_x || ypos != last_y)
+        {
+            const float rotation_speed = 0.25f;
+
+            glm::vec3 va = get_arcball_vector(last_x, last_y);
+            glm::vec3 vb = get_arcball_vector(xpos, ypos);
+            const float angle = acos(std::min(1.0f, glm::dot(va, vb))) * rotation_speed;
+            const glm::vec3 axis_camera_coordinates = glm::cross(va, vb);
+
+            glm::mat3 camera_to_object = glm::inverse(glm::mat3(arcball_camera_matrix) * glm::mat3(arcball_model_matrix));
+
+            glm::vec3 axis_in_object_coord = camera_to_object * axis_camera_coordinates;
+
+            arcball_model_matrix = glm::rotate(arcball_model_matrix, glm::degrees(angle), axis_in_object_coord);
+
+            // Set last to current
+            last_x = xpos;
+            last_y = ypos;
+        }
+    } 
+    else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE)
+    {
+        last_x = xpos;
+        last_y = ypos;
+    }
+}
+
+/**
+ * Debug function that will be used internally by OpenGL to print out warnings, errors, etc.
+ */
 void message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message, void const* user_param)
 {
     auto const src_str = [source]() {
@@ -94,23 +178,55 @@ void message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GL
     std::cout << src_str << ", " << type_str << ", " << severity_str << ", " << id << ": " << message << '\n';
 }
 
-std::vector<Vertex> calculate_base_points(float radius = 0.5f, const glm::mat4& transform = glm::mat4{ 1.0f })
+std::vector<Vertex> calculate_base_points_great_circle(const glm::mat4& transform = glm::mat4{ 1.0f })
 {
     std::vector<Vertex> base_points;
-    static const auto thetas = linear_spacing(0.0f, glm::two_pi<float>(), 80);
-
-    for (const auto theta : thetas)
+   
+    for (size_t i = 0; i < number_of_circles; ++i)
     {
-        float t = 0.0f;
+        float offset = offsets[i];
+        float arc_angle = arc_angles[i];
 
-        float c = cosf(theta + t) * radius;
-        float s = sinf(theta + t) * radius;
+        auto thetas = linear_spacing(0.0f, arc_angle, number_of_fibers);
 
-        glm::vec3 position = glm::vec3{ transform * glm::vec4{ c, s, radius * 2.0f - 1.0f, 1.0f } };
+        for (const auto theta : thetas)
+        {
+            float c = cosf(theta) * (1.0f - fabsf(offset));
+            float s = sinf(theta) * (1.0f - fabsf(offset));
+
+            glm::vec3 position = glm::vec3{ transform * glm::vec4{ c, s, offset, 1.0f } };
+        
+            Vertex vertex;
+
+            vertex.position = position;
+            vertex.color = vertex.position * 0.5f + 0.5f;
+            vertex.texture_coordinate = { 0.0f, 0.0f };
+
+            base_points.push_back(vertex);
+        }
+    }
+
+    return base_points;
+}
+
+std::vector<Vertex> calculate_base_points_random()
+{
+    std::vector<Vertex> base_points;
+
+    // Create a normal (Gaussian) distribution generator
+    std::default_random_engine generator{ seed };
+    std::normal_distribution<float> distribution(mean, standard_deviation);
+
+    for (size_t i = 0; i < number_of_fibers; ++i)
+    {
+        auto rand_x = distribution(generator);
+        auto rand_y = distribution(generator);
+        auto rand_z = distribution(generator);
+
+        const float radius = 1.0f;
 
         Vertex vertex;
-
-        vertex.position = position;
+        vertex.position = glm::normalize(glm::vec3{ rand_x, rand_y, rand_z }) * radius;
         vertex.color = vertex.position * 0.5f + 0.5f;
         vertex.texture_coordinate = { 0.0f, 0.0f };
 
@@ -120,11 +236,6 @@ std::vector<Vertex> calculate_base_points(float radius = 0.5f, const glm::mat4& 
     return base_points;
 }
 
-const uint32_t width = 1080;
-const uint32_t height = 1080;
-const uint32_t ui_w = 256;
-const uint32_t ui_h = 256;
-
 int main()
 {
     // Create GLFW window 
@@ -132,7 +243,8 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow* window = glfwCreateWindow(width, height, "ImGui Example", NULL, NULL);
+    glfwWindowHint(GLFW_RESIZABLE, false);
+    GLFWwindow* window = glfwCreateWindow(window_w, window_h, "ImGui Example", NULL, NULL);
     if (window == NULL)
     {
         std::cerr << "Failed to create GLFW window" << std::endl;
@@ -140,7 +252,8 @@ int main()
         exit(EXIT_FAILURE);
     }
     glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetWindowUserPointer(window, &input_data);
 
     // Load function pointers from glad
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -150,30 +263,40 @@ int main()
     }
     
     // Initialize ImGui
-    const char* glsl_version = "#version 460";
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; 
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui_ImplOpenGL3_Init("#version 460");
 
     // Setup initial OpenGL state
     {
-        glEnable(GL_DEBUG_OUTPUT);
+#if defined(_DEBUG)
+        // Debug logging
+       // glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(message_callback, nullptr);
+#endif
 
+        // Depth testing
+        glEnable(GL_DEPTH_TEST);
+        
+        // Primitive restart (for drawing all fibers via a single VBO)
         glEnable(GL_PRIMITIVE_RESTART);
         glPrimitiveRestartIndex(65535);
 
+        // Program point size (for setting base point draw size in the vertex shader)
         glEnable(GL_PROGRAM_POINT_SIZE);
 
+        // Line width for the fibers
         glLineWidth(2.0f);
 
+        // Alpha blending for the sphere UI
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+        // Backface culling for optimization
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
     }
@@ -182,12 +305,12 @@ int main()
     auto shader_hopf = Shader{ "../shaders/hopf.vert", "../shaders/hopf.frag" };
     auto shader_ui = Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
     
-    std::vector<Vertex> base_points = calculate_base_points();
+    std::vector<Vertex> base_points = calculate_base_points_great_circle();
     auto mesh_base_points = Mesh{ base_points, { /* No indices */ } };
     auto hopf = Hopf{ base_points };
 
-    auto mesh_sphere = Mesh::from_sphere(0.45f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
-    auto mesh_grid = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -0.5f, 0.0f });
+    auto mesh_sphere = Mesh::from_sphere(0.75f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
+    auto mesh_grid = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -0.6f, 0.0f });
 
     // Create the framebuffer that we will render the S2 sphere into
     uint32_t framebuffer_ui;
@@ -198,7 +321,7 @@ int main()
 
         // Create a color attachment texture and associate it with the framebuffer
         glCreateTextures(GL_TEXTURE_2D, 1, &texture_color_attachment_ui);
-        glTextureStorage2D(texture_color_attachment_ui, 1, GL_RGBA8, width, height);
+        glTextureStorage2D(texture_color_attachment_ui, 1, GL_RGBA8, window_w, window_h);
         glTextureParameteri(texture_color_attachment_ui, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTextureParameteri(texture_color_attachment_ui, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glNamedFramebufferTexture(framebuffer_ui, GL_COLOR_ATTACHMENT0, texture_color_attachment_ui, 0);
@@ -206,7 +329,7 @@ int main()
         // Create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
         glCreateRenderbuffers(1, &renderbuffer_ui);
         glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer_ui);
-        glNamedRenderbufferStorage(renderbuffer_ui, GL_DEPTH24_STENCIL8, width, height);
+        glNamedRenderbufferStorage(renderbuffer_ui, GL_DEPTH24_STENCIL8, window_w, window_h);
         glNamedFramebufferRenderbuffer(framebuffer_ui, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer_ui);
 
         // Now that we actually created the framebuffer and added all attachments we want to check if it is actually complete 
@@ -216,83 +339,127 @@ int main()
         }
     }
 
-    // Values affected by the GUI
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    float radius = 0.5f;
-    float rotation_x = 0.0f;
-    float rotation_y = 0.0f;
-    float rotation_z = 0.0f;
-    float last_radius = radius;
-    float last_rotation_x = rotation_x;
-    float last_rotation_y = rotation_y;
-    float last_rotation_z = rotation_z;
-    bool auto_scene_rotate = true;
-
     while (!glfwWindowShouldClose(window))
     {
-        glfwPollEvents();
+        // Update flag that denotes whether or not the user is interacting with ImGui
+        input_data.imgui_active = io.WantCaptureMouse;
 
+        // Poll regular GLFW window events
+        glfwPollEvents();
         process_input(window);
 
-        // Start the ImGui frame
+        // Handle ImGui stuff
+        bool topology_needs_update = false;
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         {
-            ImGui::Begin("Controls");                          
-            ImGui::Text("Hopf Fibration"); 
-            ImGui::SliderFloat("Radius", &radius, 0.01f, 0.5f);
-            ImGui::SliderFloat("Rotation X", &rotation_x, 0.0f, 360.0f);
-            ImGui::SliderFloat("Rotation Y", &rotation_y, 0.0f, 360.0f);
-            ImGui::SliderFloat("Rotation Z", &rotation_z, 0.0f, 360.0f);
-            ImGui::ColorEdit3("Background Clear Color", (float*)&clear_color);
-            ImGui::Text("Application Average %.3f MS/Frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::Image((void*)(intptr_t)texture_color_attachment_ui, ImVec2(ui_w, ui_h));
-            ImGui::End();
+            {
+                ImGui::Begin("Hopf Fibration");
+
+                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Primary Controls");
+
+                topology_needs_update |= ImGui::SliderInt("Number of Fibers", (int*)&number_of_fibers, 10, 400);
+
+                if (ImGui::BeginCombo("Mode", current_mode.c_str())) 
+                {
+                    for (int n = 0; n < IM_ARRAYSIZE(modes); n++)
+                    {
+                        bool is_selected = current_mode.c_str() == modes[n];
+
+                        if (ImGui::Selectable(modes[n], is_selected))
+                        {
+                            topology_needs_update |= true;
+                            current_mode = modes[n];
+                        }
+                        if (is_selected)
+                        {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::Separator();
+
+                if (current_mode == "Great Circle")
+                {
+                    ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Per-Fiber Settings");
+                    topology_needs_update |= ImGui::SliderInt("Number of Circles", (int*)&number_of_circles, 1, 10);
+
+                    // Resize radii / arc angle vectors if the user has changed the number of great circles
+                    if (topology_needs_update)
+                    {
+                        offsets = std::vector<float>(number_of_circles, 0.0f);
+                        arc_angles = std::vector<float>(number_of_circles, glm::two_pi<float>());
+                    }
+
+                    ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram));
+                    {
+                        for (size_t i = 0; i < number_of_circles; ++i)
+                        {
+                            const std::string radius_name = "Offset " + std::to_string(i + 1);
+                            topology_needs_update |= ImGui::SliderFloat(radius_name.c_str(), &offsets[i], -0.99f, 0.99f);
+
+                            const std::string arc_angle_name = "Arc Angle " + std::to_string(i + 1);
+                            topology_needs_update |= ImGui::SliderFloat(arc_angle_name.c_str(), &arc_angles[i], 0.01f, glm::two_pi<float>());
+                        }
+                    }
+                    ImGui::PopStyleColor();
+
+                    ImGui::Separator();
+                    ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Rotations (Applied to All Fibers)");
+                    topology_needs_update |= ImGui::SliderFloat("Rotation X", &rotation_x, 0.0f, glm::pi<float>());
+                    topology_needs_update |= ImGui::SliderFloat("Rotation Y", &rotation_y, 0.0f, glm::pi<float>());
+                    topology_needs_update |= ImGui::SliderFloat("Rotation Z", &rotation_z, 0.0f, glm::pi<float>());
+                }
+                else if (current_mode == "Random")
+                {
+                    topology_needs_update |= ImGui::SliderInt("Seed", (int*)&seed, 0, 1000);
+                    topology_needs_update |= ImGui::SliderFloat("Mean", &mean, -3.0f, 3.0f);
+                    topology_needs_update |= ImGui::SliderFloat("Standard Deviation", &standard_deviation, 0.0f, 3.0f);
+                }
+                ImGui::Separator();
+                ImGui::ColorEdit3("Background Clear Color", (float*)&clear_color);
+                ImGui::Separator();
+                ImGui::Text("Application Average %.3f MS/Frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+                ImGui::End();
+            }
+            {
+                ImGui::Begin("Mapping (Points on S2)");
+                ImGui::Image((void*)(intptr_t)texture_color_attachment_ui, ImVec2(ui_w, ui_h));
+                ImGui::End();
+            }
         }
         ImGui::Render();
 
-        // Grab the width and height of the default (on-screen) framebuffer, as it may have changed
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-
-        // TODO: handle window resizing...
-        // ...
-        
-        // Set up matrices
-        glm::mat4 projection = glm::perspective(
-            glm::radians(45.0f),
-            static_cast<float>(width) / static_cast<float>(height),
-            0.1f,
-            1000.0f
-        );
-
+        // The transformation matrix that will be applied to the base points on S2 to generate the fibration
         glm::mat4 model{ 1.0f };
-        model = glm::rotate(model, rotation_x * (glm::pi<float>() / 180.0f), glm::vec3{ 1.0f, 0.0f, 0.0f });
-        model = glm::rotate(model, rotation_y * (glm::pi<float>() / 180.0f), glm::vec3{ 0.0f, 1.0f, 0.0f });
-        model = glm::rotate(model, rotation_z * (glm::pi<float>() / 180.0f), glm::vec3{ 0.0f, 0.0f, 1.0f });
+        model = glm::rotate(model, rotation_x, glm::vec3{ 1.0f, 0.0f, 0.0f });
+        model = glm::rotate(model, rotation_y, glm::vec3{ 0.0f, 1.0f, 0.0f });
+        model = glm::rotate(model, rotation_z, glm::vec3{ 0.0f, 0.0f, 1.0f });
 
-        if (last_radius != radius ||
-            last_rotation_x != rotation_x || 
-            last_rotation_y != rotation_y || 
-            last_rotation_z != rotation_z)
+        if (topology_needs_update)
         {
-            std::vector<Vertex> base_points = calculate_base_points(radius, model);
+            std::vector<Vertex> base_points;
+
+            if (current_mode == "Great Circle")
+            {
+                base_points = calculate_base_points_great_circle(model);
+            }
+            else if (current_mode == "Random")
+            {
+                base_points = calculate_base_points_random();
+            }
+
             mesh_base_points.set_vertices(base_points);
 
             hopf = Hopf{ base_points };
-
-            // Set prev to next
-            last_radius = radius;
-            last_rotation_x = rotation_x;
-            last_rotation_y = rotation_y;
-            last_rotation_z = rotation_z;
         }
 
         // Render 3D objects to UI (offscreen) framebuffer
         {
-            glViewport(0, 0, width, height);
-            glEnable(GL_DEPTH_TEST);
+            glViewport(0, 0, window_w, window_h);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
             glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_ui);
 
@@ -302,8 +469,15 @@ int main()
             glClearNamedFramebufferfv(framebuffer_ui, GL_COLOR, color_buffer_index, clear_color_values);
             glClearNamedFramebufferfv(framebuffer_ui, GL_DEPTH, 0, &clear_depth_value);
             
+            glm::mat4 projection = glm::perspective(
+                glm::radians(45.0f),
+                static_cast<float>(ui_w) / static_cast<float>(ui_h),
+                0.1f,
+                1000.0f
+            );
+
             glm::mat4 view = glm::lookAt(
-                glm::vec3{ 0.0f, 0.0f, 3.0f },
+                glm::vec3{ 0.0f, 0.0f, 5.0f },
                 glm::vec3{ 0.0f, 0.0f, 0.0f },
                 glm::vec3{ 0.0f, 1.0f, 0.0f }
             );
@@ -328,22 +502,30 @@ int main()
 
         // Render 3D objects to default framebuffer
         {
-            glViewport(0, 0, width, height);
-            glDisable(GL_DEPTH_TEST);
+            glViewport(0, 0, window_w, window_h);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
             glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-            glClear(GL_COLOR_BUFFER_BIT);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            glm::mat4 view = glm::lookAt(camera_position, glm::vec3{ 0.0f }, camera_up);//camera_position + camera_front
+            glm::mat4 projection = glm::perspective(
+                glm::radians(45.0f),
+                static_cast<float>(window_w) / static_cast<float>(window_h),
+                0.1f,
+                1000.0f
+            );
 
             shader_hopf.use();
             shader_hopf.uniform_float("u_time", glfwGetTime());
             shader_hopf.uniform_mat4("u_projection", projection);
-            shader_hopf.uniform_mat4("u_view", view);
-            shader_hopf.uniform_mat4("u_model", model);
+            shader_hopf.uniform_mat4("u_view", arcball_camera_matrix);
 
+            shader_hopf.uniform_mat4("u_model", arcball_model_matrix);
             hopf.draw();
 
+            // Reset model matrix
+            glm::mat4 model{ 1.0f };
+            shader_hopf.uniform_mat4("u_model", model);
             mesh_grid.draw();
         }
 

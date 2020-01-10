@@ -101,26 +101,28 @@ public:
                 // . . . 
                 // .
                 // .
-                // Note: we assume a clockwise winding pattern.
+                // Note: we assume a counter-clockwise winding pattern.
 
                 // We don't need to form any triangles for the last row
                 size_t cell = col + u_subdivisions * row;
                 if ((row + 1) % v_subdivisions != 0)
                 {
-                    // Form the first triangle (i.e. 0 -> 5 -> 4...).
+                    // Form the first triangle (i.e. 0 -> 4 -> 5...).
                     if ((col + 1) % u_subdivisions != 0)
                     {
                         indices.push_back(cell);
-                        indices.push_back(cell + u_subdivisions + 1);
+                        
                         indices.push_back(cell + u_subdivisions);
+                        indices.push_back(cell + u_subdivisions + 1);
                     }
 
                     // Only form this triangle if we aren't on the first (0-th) column.
                     if (col % u_subdivisions != 0)
                     {
                         indices.push_back(cell);
-                        indices.push_back(cell + u_subdivisions);
                         indices.push_back(cell - 1);
+                        indices.push_back(cell + u_subdivisions);
+                        
                     }
                 }
             }
@@ -167,8 +169,23 @@ public:
 
     void set_vertices(const std::vector<Vertex>& updated_vertices)
     {
-        vertices = updated_vertices;
-        glNamedBufferSubData(vbo, 0, sizeof(Vertex) * vertices.size(), vertices.data());
+        // Re-allocate the buffer if more space is needed: otherwise, we can simply copy in the new data because
+        // we already have enough storage
+        if (vertices.size() < updated_vertices.size())
+        {
+            // In DSA, if you need to re-allocate buffer memory, you basically have to reinitialize the 
+            // entire buffer, per: https://www.reddit.com/r/opengl/comments/aifvjl/glnamedbufferstorage_vs_glbufferdata/
+            vertices = updated_vertices;
+            setup();
+        }
+        else
+        {
+            
+            glNamedBufferSubData(vbo, 0, sizeof(Vertex) * updated_vertices.size(), updated_vertices.data());
+            vertices = updated_vertices;
+        }
+
+       
     }
 
     size_t get_vertex_count() const

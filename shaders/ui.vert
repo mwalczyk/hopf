@@ -16,7 +16,7 @@ out VS_OUT
 
 void main() 
 {
-    gl_PointSize = 8.0;
+    gl_PointSize = 14.0;
     gl_Position = u_projection * u_view * u_model * vec4(i_position, 1.0);
 
     vs_out.color = i_position * 0.5 + 0.5;
