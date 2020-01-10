@@ -131,7 +131,12 @@ public:
         return Mesh{ vertices, indices };
     }
 
-    Mesh() = default;
+    Mesh()
+    {
+        glCreateVertexArrays(1, &vao);
+        glCreateBuffers(1, &vbo);
+        glCreateBuffers(1, &ibo);
+    }
 
     Mesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices) :
         vertices{ vertices },
@@ -176,6 +181,9 @@ public:
             // In DSA, if you need to re-allocate buffer memory, you basically have to reinitialize the 
             // entire buffer, per: https://www.reddit.com/r/opengl/comments/aifvjl/glnamedbufferstorage_vs_glbufferdata/
             vertices = updated_vertices;
+            glDeleteVertexArrays(1, &vao);
+            glDeleteBuffers(1, &vbo);
+            glDeleteBuffers(1, &ibo);
             setup();
         }
         else

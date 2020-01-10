@@ -30,7 +30,7 @@ const uint32_t ui_h = 256;
 bool first_mouse = true;
 float last_x;
 float last_y;
-glm::mat4 arcball_camera_matrix = glm::lookAt(glm::vec3{ 0.0f, 1.0f, 6.0f }, glm::vec3{ 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
+glm::mat4 arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 1.0f, 0.0f }, glm::vec3{ 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
 glm::mat4 arcball_model_matrix = glm::mat4{ 1.0f };
 
 // Values affected by the GUI
@@ -44,9 +44,11 @@ float rotation_z = 0.0f;            // For mode: "Great Circle"
 uint32_t seed = 0.0f;               // For mode: "Random"
 float mean = 0.0f;                  // For mode: "Random"
 float standard_deviation = 1.0f;    // For mode: "Random"
-size_t number_of_fibers = 40;
+float loxodrome_offset = 2.0f;      // For mode: "Loxodrome"
 
-const char* modes[] = { "Great Circle", "Random" };
+size_t number_of_fibers = 100;
+
+const char* modes[] = { "Great Circle", "Random", "Loxodrome" };
 std::string current_mode = modes[0];
 
 InputData input_data;
@@ -236,6 +238,32 @@ std::vector<Vertex> calculate_base_points_random()
     return base_points;
 }
 
+std::vector<Vertex> calculate_base_points_loxodrome()
+{
+    std::vector<Vertex> base_points;
+
+    auto thetas = linear_spacing(-glm::pi<float>() * 0.5f, glm::pi<float>() * 0.5f, number_of_fibers);
+
+    for (size_t i = 0; i < number_of_fibers; ++i)
+    {
+       
+        const float radius = 1.0f;
+        
+        const float x = radius * cosf(thetas[i]) * cosf(thetas[i] * loxodrome_offset);
+        const float y = radius * cosf(thetas[i]) * sinf(thetas[i] * loxodrome_offset);
+        const float z = radius * sinf(thetas[i]);
+
+        Vertex vertex;
+        vertex.position = glm::vec3{ x, y, z };
+        vertex.color = vertex.position * 0.5f + 0.5f;
+        vertex.texture_coordinate = { 0.0f, 0.0f };
+
+        base_points.push_back(vertex);
+    }
+
+    return base_points;
+}
+
 int main()
 {
     // Create GLFW window 
@@ -389,18 +417,21 @@ int main()
                     // Resize radii / arc angle vectors if the user has changed the number of great circles
                     if (topology_needs_update)
                     {
-                        offsets = std::vector<float>(number_of_circles, 0.0f);
-                        arc_angles = std::vector<float>(number_of_circles, glm::two_pi<float>());
+                        
+                        offsets = linear_spacing(0.0f, -0.9f, number_of_circles);
+                        arc_angles = linear_spacing((glm::two_pi<float>()) * 0.25f, glm::two_pi<float>(), number_of_circles);
                     }
 
                     ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram));
                     {
                         for (size_t i = 0; i < number_of_circles; ++i)
                         {
-                            const std::string radius_name = "Offset " + std::to_string(i + 1);
-                            topology_needs_update |= ImGui::SliderFloat(radius_name.c_str(), &offsets[i], -0.99f, 0.99f);
-
+                            const std::string name = "Circle " + std::to_string(i + 1);
+                            const std::string offset_name = "Offset " + std::to_string(i + 1);
                             const std::string arc_angle_name = "Arc Angle " + std::to_string(i + 1);
+                            ImGui::Text(name.c_str());
+
+                            topology_needs_update |= ImGui::SliderFloat(offset_name.c_str(), &offsets[i], -0.99f, 0.99f);
                             topology_needs_update |= ImGui::SliderFloat(arc_angle_name.c_str(), &arc_angles[i], 0.01f, glm::two_pi<float>());
                         }
                     }
@@ -417,6 +448,10 @@ int main()
                     topology_needs_update |= ImGui::SliderInt("Seed", (int*)&seed, 0, 1000);
                     topology_needs_update |= ImGui::SliderFloat("Mean", &mean, -3.0f, 3.0f);
                     topology_needs_update |= ImGui::SliderFloat("Standard Deviation", &standard_deviation, 0.0f, 3.0f);
+                }
+                else if (current_mode == "Loxodrome")
+                {
+                    topology_needs_update |= ImGui::SliderFloat("Loxodrome Offset", &loxodrome_offset, 2.0f, 20.0f);
                 }
                 ImGui::Separator();
                 ImGui::ColorEdit3("Background Clear Color", (float*)&clear_color);
@@ -449,6 +484,10 @@ int main()
             else if (current_mode == "Random")
             {
                 base_points = calculate_base_points_random();
+            }
+            else if (current_mode == "Loxodrome")
+            {
+                base_points = calculate_base_points_loxodrome();
             }
 
             mesh_base_points.set_vertices(base_points);

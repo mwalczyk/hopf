@@ -131,7 +131,7 @@ public:
 
 	void generate_fibration(size_t iterations_per_fiber = 130)
 	{
-		auto thetas = linear_spacing(0.0f, glm::two_pi<float>(), iterations_per_fiber);
+		auto phis = linear_spacing(0.0f, glm::two_pi<float>(), iterations_per_fiber);
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
 		
@@ -144,19 +144,21 @@ public:
 			float coeff = 1.0f / sqrtf(2.0f * (1.0f + c));
 
 			// Every `steps` points (in 4-space) form a single fiber of the Hopf fibration
-			std::vector<glm::vec3> path;
-
 			for (size_t j = 0; j < iterations_per_fiber; j++)
 			{
-				float theta = thetas[j];
+				float phi = phis[j];
 
 				// Points in 4-space: a rotation by the quaternion <x, y, z, w> would send the
 				// point <0, 0, 1> on S2 to the point <a, b, c> - thus, each base point sweeps
 				// out a great circle ("fiber") on S2
-				const float w = coeff * (1.0f + c) * cosf(theta);
-				const float x = coeff * (a * sinf(theta) - b * cosf(theta));
-				const float y = coeff * (a * cosf(theta) + b * sinf(theta));
-				const float z = coeff * (1.0f + c) * sinf(theta);
+				const float theta = atan2f(-a, b) - phi;
+				const float alpha = sqrtf((1.0f + c) / 2.0f);
+				const float beta = sqrtf((1.0f - c) / 2.0f);
+
+				const float	w = alpha * cosf(theta);
+				const float	x = alpha * sinf(theta);
+				const float	y = beta * cosf(phi);
+				const float	z = beta * sinf(phi);
 
 				// Modified stereographic projection onto the unit ball in 3-space from:
 				// https://nilesjohnson.net/hopf-production.html
@@ -185,15 +187,7 @@ public:
 
 			// Primitive restart
 			indices.push_back(65535);
-
-			//auto tube_vertices = build_tube(path);
-			//std::cout << "Generating tube with " << tube_vertices.size() << " vertices\n";
-
-			// Append all vertices
-			//vertices.insert(std::end(vertices), std::begin(tube_vertices), std::end(tube_vertices));
-
 		}
-		//std::cout << "Generated fibration with " << vertices.size() << " vertices and " << indices.size() << " indices\n";
 
 		mesh = Mesh{ vertices, indices };
 	}
@@ -212,7 +206,6 @@ public:
 	{
 		return base_points.size();
 	}
-
 
 private:
 
