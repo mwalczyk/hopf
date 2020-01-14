@@ -2,10 +2,11 @@
 🧣 A graphical program for exploring the Hopf fibration.
 
 <p align="center">
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/fibration_with_ui.png" alt="screenshot" width="400" height="auto"/>
+  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/fibration.png" alt="screenshot" width="400" height="auto"/>
 </p>
 
 ## Description
+What does this do?
 
 ## Tested On
 - Windows 10
