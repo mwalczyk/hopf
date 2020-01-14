@@ -40,6 +40,14 @@ There are several visualization modes available, each of which corresponds to a 
 - `Random`: sets the codomain to a randomly distributed set of points on the surface of S2
 - `Loxodrome`: sets the codomain to a [Rhumb line](https://en.wikipedia.org/wiki/Rhumb_line) (spiral arc) on the surface of S2
 
+The three different modes are shown below:
+
+<p align="center">
+  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/mode_great_circle.png" alt="screenshot" width="200" height="auto"/>
+  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/mode_random.png" alt="screenshot" width="200" height="auto"/>
+  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/mode_loxodrome.png" alt="screenshot" width="200" height="auto"/>
+</p>
+
 ## To Do
 - [ ] Clean up the `Mesh` class
 - [ ] Research ways of generating the topology directly on the GPU (compute shaders?)
