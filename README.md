@@ -6,7 +6,11 @@
 </p>
 
 ## Description
-What does this do?
+The Hopf fibration is a mapping from S3 to S2 discovered by Heinz Hopf in 1931. Confusingly, S3 actually refers to the sphere (or hypersphere) in 4D space. Similarly, S2 refers to the sphere that we are most familiar with in 3D space. To quote Wikipedia: "Hopf found a many-to-one continuous function (or 'map') from the 3-sphere onto the 2-sphere such that each distinct point of the 2-sphere is mapped to from a distinct great circle of the 3-sphere."
+
+A "great circle" is essentially a planar "slice" of a sphere that passes through its center. It is difficult to visualize what a great circle on the surface of a 4-dimensional sphere looks like, but luckily, we don't have to. Each of these great circles in the domain of the mapping function forms a "fiber" that we can project down to 3-space. Doing so results in a beautiful structure of nested shapes that appear to be intricately woven together.
+
+How does the mapping work?
 
 ## Tested On
 - Windows 10
@@ -30,7 +34,11 @@ cmake ..
 4. Build and run the project
 
 ## To Use
-Notes about using the UI.
+There are several visualization modes available, each of which corresponds to a (configurable) set of points on the surface of S2 that form the codomain of the mapping:
+
+- `Great Circle`: sets the codomain to the set of points formed by one or more great circles on the surfaces of S2
+- `Random`: sets the codomain to a randomly distributed set of points on the surface of S2
+- `Loxodrome`: sets the codomain to a [Rhumb line](https://en.wikipedia.org/wiki/Rhumb_line) (spiral arc) on the surface of S2
 
 ## To Do
 - [ ] Clean up the `Mesh` class
