@@ -121,32 +121,41 @@ std::vector<glm::vec3> build_tube(const std::vector<glm::vec3>& path)
 
 class Hopf
 {
+
 public:
 	
-	Hopf(const std::vector<Vertex>& base_points) :
+	Hopf(const std::vector<Vertex>& base_points, size_t iterations_per_fiber = 130) :
 		base_points{ base_points }
 	{
-		generate_fibration();
+		generate_fibration(iterations_per_fiber);
 	}
 
-	void generate_fibration(size_t iterations_per_fiber = 130)
+	void set_base_points(const std::vector<Vertex>& updated_base_points)
+	{
+		base_points = updated_base_points;
+		mesh.set_vertices(updated_base_points);
+	}
+
+	void generate_fibration(size_t iterations_per_fiber)
 	{
 		auto phis = linear_spacing(0.0f, glm::two_pi<float>(), iterations_per_fiber);
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
-		
+
 		for (size_t i = 0; i < base_points.size(); ++i)
 		{
+			// Grab the current base point on S2
 			const auto point = base_points[i];
-			float a = point.position.x;
-			float b = point.position.y;
-			float c = point.position.z;
-			float coeff = 1.0f / sqrtf(2.0f * (1.0f + c));
+			const float a = point.position.x;
+			const float b = point.position.y;
+			const float c = point.position.z;
 
-			// Every `steps` points (in 4-space) form a single fiber of the Hopf fibration
-			for (size_t j = 0; j < iterations_per_fiber; j++)
+			const float coeff = 1.0f / sqrtf(2.0f * (1.0f + c));
+
+			// Every `iterations_per_fiber` points (in 4-space) form a single fiber of the Hopf fibration
+			for (size_t j = 0; j < iterations_per_fiber; ++j)
 			{
-				float phi = phis[j];
+				const float phi = phis[j];
 
 				// Points in 4-space: a rotation by the quaternion <x, y, z, w> would send the
 				// point <0, 0, 1> on S2 to the point <a, b, c> - thus, each base point sweeps
@@ -178,7 +187,7 @@ public:
 				};
 				vertex.texture_coordinate = glm::vec2{
 					0.0f, // Unused, at the moment
-					0.0f 
+					0.0f
 				};
 
 				vertices.push_back(vertex);
@@ -192,14 +201,27 @@ public:
 		mesh = Mesh{ vertices, indices };
 	}
 
-	void draw() const
+	void draw(bool as_points = false) const
 	{
-		mesh.draw(GL_LINE_LOOP);
+		if (as_points)
+		{
+			mesh.draw(GL_POINTS);
+		}
+		else
+		{
+			// For now, draw the fibers as connected line segments (path guided extrusion soon?)
+			mesh.draw(GL_LINE_LOOP);
+		}
 	}
 
 	const Mesh& get_mesh() const
 	{
 		return mesh;
+	}
+	
+	const std::vector<Vertex>& get_base_points() const
+	{
+		return base_points;
 	}
 
 	size_t get_base_point_count() const
@@ -210,9 +232,6 @@ public:
 private:
 
 	Mesh mesh;
-	
-	uint32_t vao;
-	uint32_t vbo;
 
 	std::vector<Vertex> base_points;
 };

@@ -23,6 +23,7 @@ struct InputData
     bool imgui_active = false;
 };
 
+// Viewport and camera details
 const uint32_t window_w = 1080;
 const uint32_t window_h = 1080;
 const uint32_t ui_w = 256;
@@ -30,34 +31,49 @@ const uint32_t ui_h = 256;
 bool first_mouse = true;
 float last_x;
 float last_y;
-glm::mat4 arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 1.0f, 0.0f }, glm::vec3{ 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
+glm::mat4 arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 1.0f, 0.0f }, glm::vec3{ 0.0f }, glm::vec3{ 1.0f, 1.0f, 0.0f });
 glm::mat4 arcball_model_matrix = glm::mat4{ 1.0f };
 
-// Values affected by the GUI
-ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-uint32_t number_of_circles = 1;     // For mode: "Great Circle"
-std::vector<float> offsets = { 0.0f };// For mode: "Great Circle"
-std::vector<float> arc_angles = { glm::two_pi<float>() }; // For mode: "Great Circle"
-float rotation_x = 0.0f;            // For mode: "Great Circle"
-float rotation_y = 0.0f;            // For mode: "Great Circle"
-float rotation_z = 0.0f;            // For mode: "Great Circle"
-uint32_t seed = 0.0f;               // For mode: "Random"
-float mean = 0.0f;                  // For mode: "Random"
-float standard_deviation = 1.0f;    // For mode: "Random"
-float loxodrome_offset = 2.0f;      // For mode: "Loxodrome"
 
+// Global settings
 size_t number_of_fibers = 100;
-
-const char* modes[] = { "Great Circle", "Random", "Loxodrome" };
+const std::vector<std::string> modes = { "Great Circle", "Random", "Loxodrome" };
 std::string current_mode = modes[0];
+
+// Per-mode settings
+uint32_t number_of_circles = 1;                             // For mode: "Great Circle"
+std::vector<float> offsets = { 0.0f };                      // For mode: "Great Circle"
+std::vector<float> arc_angles = { glm::two_pi<float>() };   // For mode: "Great Circle"
+float rotation_x = 0.0f;                                    // For mode: "Great Circle"
+float rotation_y = 0.0f;                                    // For mode: "Great Circle"
+float rotation_z = 0.0f;                                    // For mode: "Great Circle"
+uint32_t seed = 0.0f;                                       // For mode: "Random"
+float mean = 0.0f;                                          // For mode: "Random"
+float standard_deviation = 1.0f;                            // For mode: "Random"
+float loxodrome_offset = 2.0f;                              // For mode: "Loxodrome"
+
+// Appearance
+ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);   
+bool show_floor_plane = true;
+bool draw_as_points = false;
 
 InputData input_data;
 
+/**
+ * A function for handling key presses.
+ */
 void process_input(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(window, true);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
+    {
+        // Reset the arcball camera
+        arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 1.0f, 0.0f }, glm::vec3{ 0.0f }, glm::vec3{ 1.0f, 1.0f, 0.0f });
+        arcball_model_matrix = glm::mat4{ 1.0f };
     }
 }
 
@@ -186,17 +202,17 @@ std::vector<Vertex> calculate_base_points_great_circle(const glm::mat4& transfor
    
     for (size_t i = 0; i < number_of_circles; ++i)
     {
-        float offset = offsets[i];
-        float arc_angle = arc_angles[i];
+        const float offset = offsets[i];
+        const float arc_angle = arc_angles[i];
 
-        auto thetas = linear_spacing(0.0f, arc_angle, number_of_fibers);
+        const auto thetas = linear_spacing(0.0f, arc_angle, number_of_fibers);
 
         for (const auto theta : thetas)
         {
-            float c = cosf(theta) * (1.0f - fabsf(offset));
-            float s = sinf(theta) * (1.0f - fabsf(offset));
+            const float c = cosf(theta) * (1.0f - fabsf(offset));
+            const float s = sinf(theta) * (1.0f - fabsf(offset));
 
-            glm::vec3 position = glm::vec3{ transform * glm::vec4{ c, s, offset, 1.0f } };
+            const glm::vec3 position = glm::vec3{ transform * glm::vec4{ c, s, offset, 1.0f } };
         
             Vertex vertex;
 
@@ -211,7 +227,7 @@ std::vector<Vertex> calculate_base_points_great_circle(const glm::mat4& transfor
     return base_points;
 }
 
-std::vector<Vertex> calculate_base_points_random()
+std::vector<Vertex> calculate_base_points_random(const glm::mat4& transform = glm::mat4{ 1.0f })
 {
     std::vector<Vertex> base_points;
 
@@ -221,14 +237,14 @@ std::vector<Vertex> calculate_base_points_random()
 
     for (size_t i = 0; i < number_of_fibers; ++i)
     {
-        auto rand_x = distribution(generator);
-        auto rand_y = distribution(generator);
-        auto rand_z = distribution(generator);
+        const auto rand_x = distribution(generator);
+        const auto rand_y = distribution(generator);
+        const auto rand_z = distribution(generator);
 
         const float radius = 1.0f;
 
         Vertex vertex;
-        vertex.position = glm::normalize(glm::vec3{ rand_x, rand_y, rand_z }) * radius;
+        vertex.position = glm::vec3{ transform * glm::vec4{ glm::normalize(glm::vec3{ rand_x, rand_y, rand_z }) * radius, 1.0f} };
         vertex.color = vertex.position * 0.5f + 0.5f;
         vertex.texture_coordinate = { 0.0f, 0.0f };
 
@@ -238,11 +254,12 @@ std::vector<Vertex> calculate_base_points_random()
     return base_points;
 }
 
-std::vector<Vertex> calculate_base_points_loxodrome()
+std::vector<Vertex> calculate_base_points_loxodrome(const glm::mat4& transform = glm::mat4{ 1.0f })
 {
     std::vector<Vertex> base_points;
 
-    auto thetas = linear_spacing(-glm::pi<float>() * 0.5f, glm::pi<float>() * 0.5f, number_of_fibers);
+    // Don't go all the way to `pi / 2` because there are discontinuities at the poles
+    auto thetas = linear_spacing(-glm::pi<float>() * 0.45f, glm::pi<float>() * 0.45f, number_of_fibers);
 
     for (size_t i = 0; i < number_of_fibers; ++i)
     {
@@ -254,7 +271,7 @@ std::vector<Vertex> calculate_base_points_loxodrome()
         const float z = radius * sinf(thetas[i]);
 
         Vertex vertex;
-        vertex.position = glm::vec3{ x, y, z };
+        vertex.position = glm::vec3{ transform * glm::vec4{ x, y, z, 1.0f } };
         vertex.color = vertex.position * 0.5f + 0.5f;
         vertex.texture_coordinate = { 0.0f, 0.0f };
 
@@ -266,14 +283,15 @@ std::vector<Vertex> calculate_base_points_loxodrome()
 
 int main()
 {
-    // Create GLFW window 
+    // Create and configure the GLFW window 
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, false);
-    GLFWwindow* window = glfwCreateWindow(window_w, window_h, "ImGui Example", NULL, NULL);
-    if (window == NULL)
+    glfwWindowHint(GLFW_SAMPLES, 4);
+    GLFWwindow* window = glfwCreateWindow(window_w, window_h, "Hopf Fibration", nullptr, nullptr);
+    if (window == nullptr)
     {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -303,7 +321,7 @@ int main()
     {
 #if defined(_DEBUG)
         // Debug logging
-       // glEnable(GL_DEBUG_OUTPUT);
+        glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(message_callback, nullptr);
 #endif
 
@@ -339,6 +357,7 @@ int main()
 
     auto mesh_sphere = Mesh::from_sphere(0.75f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
     auto mesh_grid = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -0.6f, 0.0f });
+    auto mesh_coordinate_frame = Mesh::from_coordinate_frame(10.f);
 
     // Create the framebuffer that we will render the S2 sphere into
     uint32_t framebuffer_ui;
@@ -376,29 +395,33 @@ int main()
         glfwPollEvents();
         process_input(window);
 
-        // Handle ImGui stuff
+        // This flag will be set to `true` by the various UI elements if the settings have changed
+        // in such a way as to warrant a recalculation of the fibration topology 
         bool topology_needs_update = false;
+
+        // Handle ImGui stuff
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         {
+            // Container #1: settings 
             {
                 ImGui::Begin("Hopf Fibration");
 
+                // Global settings (shared across modes)
                 ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Primary Controls");
-
                 topology_needs_update |= ImGui::SliderInt("Number of Fibers", (int*)&number_of_fibers, 10, 400);
 
                 if (ImGui::BeginCombo("Mode", current_mode.c_str())) 
                 {
-                    for (int n = 0; n < IM_ARRAYSIZE(modes); n++)
+                    for (size_t i = 0; i < modes.size(); i++)
                     {
-                        bool is_selected = current_mode.c_str() == modes[n];
+                        bool is_selected = current_mode.c_str() == modes[i];
 
-                        if (ImGui::Selectable(modes[n], is_selected))
+                        if (ImGui::Selectable(modes[i].c_str(), is_selected))
                         {
                             topology_needs_update |= true;
-                            current_mode = modes[n];
+                            current_mode = modes[i];
                         }
                         if (is_selected)
                         {
@@ -409,26 +432,28 @@ int main()
                 }
                 ImGui::Separator();
 
+                // Per-mode UI settings
                 if (current_mode == "Great Circle")
                 {
                     ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Per-Fiber Settings");
-                    topology_needs_update |= ImGui::SliderInt("Number of Circles", (int*)&number_of_circles, 1, 10);
+                    bool number_of_circles_changed = ImGui::SliderInt("Number of Circles", (int*)&number_of_circles, 1, 10);
+                    topology_needs_update |= number_of_circles_changed;
 
-                    // Resize radii / arc angle vectors if the user has changed the number of great circles
-                    if (topology_needs_update)
+                    // Resize radii / arc angle vectors if the user has changed the number of circles
+                    if (number_of_circles_changed)
                     {
-                        
                         offsets = linear_spacing(0.0f, -0.9f, number_of_circles);
-                        arc_angles = linear_spacing((glm::two_pi<float>()) * 0.25f, glm::two_pi<float>(), number_of_circles);
+                        arc_angles = linear_spacing((glm::two_pi<float>()) * 0.25f, glm::two_pi<float>() * 0.75f, number_of_circles);
                     }
 
+                    // Draw per-circle sliders with a different color
                     ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram));
                     {
                         for (size_t i = 0; i < number_of_circles; ++i)
                         {
                             const std::string name = "Circle " + std::to_string(i + 1);
-                            const std::string offset_name = "Offset " + std::to_string(i + 1);
-                            const std::string arc_angle_name = "Arc Angle " + std::to_string(i + 1);
+                            const std::string offset_name = "Offset##" + std::to_string(i + 1);
+                            const std::string arc_angle_name = "Arc Angle##" + std::to_string(i + 1);
                             ImGui::Text(name.c_str());
 
                             topology_needs_update |= ImGui::SliderFloat(offset_name.c_str(), &offsets[i], -0.99f, 0.99f);
@@ -436,29 +461,35 @@ int main()
                         }
                     }
                     ImGui::PopStyleColor();
-
-                    ImGui::Separator();
-                    ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Rotations (Applied to All Fibers)");
-                    topology_needs_update |= ImGui::SliderFloat("Rotation X", &rotation_x, 0.0f, glm::pi<float>());
-                    topology_needs_update |= ImGui::SliderFloat("Rotation Y", &rotation_y, 0.0f, glm::pi<float>());
-                    topology_needs_update |= ImGui::SliderFloat("Rotation Z", &rotation_z, 0.0f, glm::pi<float>());
                 }
                 else if (current_mode == "Random")
                 {
                     topology_needs_update |= ImGui::SliderInt("Seed", (int*)&seed, 0, 1000);
                     topology_needs_update |= ImGui::SliderFloat("Mean", &mean, -3.0f, 3.0f);
-                    topology_needs_update |= ImGui::SliderFloat("Standard Deviation", &standard_deviation, 0.0f, 3.0f);
+                    topology_needs_update |= ImGui::SliderFloat("Standard Deviation", &standard_deviation, 0.1f, 3.0f);
                 }
                 else if (current_mode == "Loxodrome")
                 {
                     topology_needs_update |= ImGui::SliderFloat("Loxodrome Offset", &loxodrome_offset, 2.0f, 20.0f);
                 }
+
+                // Global rotation applied to all base points in every mode
                 ImGui::Separator();
-                ImGui::ColorEdit3("Background Clear Color", (float*)&clear_color);
+                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Rotations (Applied to All Fibers)");
+                topology_needs_update |= ImGui::SliderFloat("Rotation X", &rotation_x, 0.0f, glm::pi<float>());
+                topology_needs_update |= ImGui::SliderFloat("Rotation Y", &rotation_y, 0.0f, glm::pi<float>());
+                topology_needs_update |= ImGui::SliderFloat("Rotation Z", &rotation_z, 0.0f, glm::pi<float>());
+
+                ImGui::Separator();
+                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Appearance");
+                ImGui::ColorEdit3("Background Color", (float*)&clear_color);
+                ImGui::Checkbox("Show Floor Plane", &show_floor_plane);
+                ImGui::Checkbox("Draw as Points (Instead of Lines)", &draw_as_points);
                 ImGui::Separator();
                 ImGui::Text("Application Average %.3f MS/Frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
                 ImGui::End();
             }
+            // Container #2: preview UI
             {
                 ImGui::Begin("Mapping (Points on S2)");
                 ImGui::Image((void*)(intptr_t)texture_color_attachment_ui, ImVec2(ui_w, ui_h));
@@ -483,11 +514,11 @@ int main()
             }
             else if (current_mode == "Random")
             {
-                base_points = calculate_base_points_random();
+                base_points = calculate_base_points_random(model);
             }
             else if (current_mode == "Loxodrome")
             {
-                base_points = calculate_base_points_loxodrome();
+                base_points = calculate_base_points_loxodrome(model);
             }
 
             mesh_base_points.set_vertices(base_points);
@@ -530,9 +561,10 @@ int main()
             shader_ui.uniform_bool("u_alpha", false);
             mesh_base_points.draw(GL_POINTS);
 
-            // Reset model matrix
-            glm::mat4 model{ 1.0f };
-            shader_ui.uniform_mat4("u_model", model);
+            shader_ui.uniform_mat4("u_model", glm::mat4{ 1.0f });
+            mesh_coordinate_frame.draw(GL_LINES);
+
+            shader_ui.uniform_mat4("u_model", glm::mat4{ 1.0f });
             shader_ui.uniform_bool("u_alpha", true);
             mesh_sphere.draw();
 
@@ -560,12 +592,13 @@ int main()
             shader_hopf.uniform_mat4("u_view", arcball_camera_matrix);
 
             shader_hopf.uniform_mat4("u_model", arcball_model_matrix);
-            hopf.draw();
+            hopf.draw(draw_as_points);
 
-            // Reset model matrix
-            glm::mat4 model{ 1.0f };
-            shader_hopf.uniform_mat4("u_model", model);
-            mesh_grid.draw();
+            if (show_floor_plane)
+            {
+                shader_hopf.uniform_mat4("u_model", glm::mat4{ 1.0f });
+                mesh_grid.draw();
+            }
         }
 
         // Render UI

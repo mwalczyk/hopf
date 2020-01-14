@@ -27,6 +27,7 @@ mat4 rotation(vec3 axis, float angle)
 
 void main() 
 {
+    gl_PointSize = 4.0;
     gl_Position = u_projection * u_view * u_model * vec4(i_position, 1.0);
 
     vs_color = i_color;

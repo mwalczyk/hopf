@@ -131,6 +131,47 @@ public:
         return Mesh{ vertices, indices };
     }
 
+    static Mesh from_coordinate_frame(float size, const glm::vec3& center = glm::vec3{ 0.0f })
+    {
+        std::vector<Vertex> vertices = {
+            // X-axis
+            Vertex {
+                glm::vec3{0.0f} + center,
+                glm::vec3{1.0f, 0.0f, 0.0f}
+            },
+            Vertex {
+                glm::vec3{1.0f, 0.0f, 0.0f} * size + center,
+                glm::vec3{1.0f, 0.0f, 0.0f}
+            },
+
+            // Y-axis
+            Vertex {
+                glm::vec3{0.0f} + center,
+                glm::vec3{0.0f, 1.0f, 0.0f}
+            },
+            Vertex {
+                glm::vec3{0.0f, 1.0f, 0.0f} * size + center,
+                glm::vec3{0.0f, 1.0f, 0.0f}
+            },
+
+            // Z-axis
+            Vertex {
+                glm::vec3{0.0f} + center,
+                glm::vec3{0.0f, 0.0f, 1.0f}
+            },
+            Vertex {
+                glm::vec3{0.0f, 0.0f, 1.0f} * size + center,
+                glm::vec3{0.0f, 0.0f, 1.0f}
+            },
+        };
+
+        std::vector<uint32_t> indices = {
+            0, 1, 2, 3, 4, 5, 6
+        };
+
+        return Mesh{ vertices, indices };
+    }
+
     Mesh()
     {
         glCreateVertexArrays(1, &vao);
