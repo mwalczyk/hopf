@@ -124,7 +124,7 @@ class Hopf
 
 public:
 	
-	Hopf(const std::vector<Vertex>& base_points, size_t iterations_per_fiber = 130) :
+	Hopf(const std::vector<Vertex>& base_points, size_t iterations_per_fiber = 300) :
 		base_points{ base_points }
 	{
 		generate_fibration(iterations_per_fiber);
