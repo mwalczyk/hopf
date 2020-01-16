@@ -53,6 +53,7 @@ float standard_deviation = 1.0f;                            // For mode: "Random
 float loxodrome_offset = 2.0f;                              // For mode: "Loxodrome"
 
 // Appearance
+static char filename[64] = "Hopf.obj";
 ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);   
 bool show_floor_plane = true;
 bool draw_as_points = false;
@@ -482,6 +483,12 @@ int main()
 
                 ImGui::Separator();
                 ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Appearance");
+                ImGui::InputText("", filename, 64);
+                ImGui::SameLine();
+                if (ImGui::Button("Export"))
+                {
+                    hopf.save_obj(filename);
+                }
                 ImGui::ColorEdit3("Background Color", (float*)&clear_color);
                 ImGui::Checkbox("Show Floor Plane", &show_floor_plane);
                 ImGui::Checkbox("Draw as Points (Instead of Lines)", &draw_as_points);

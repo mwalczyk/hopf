@@ -247,6 +247,16 @@ public:
         return indices.size();
     }
 
+    const std::vector<Vertex>& get_vertices() const
+    {
+        return vertices;
+    }
+
+    const std::vector<uint32_t>& get_indices() const
+    {
+        return indices;
+    }
+
 private:
 
     bool has_indices = false;

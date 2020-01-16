@@ -1,6 +1,8 @@
 #pragma once
 
 #include <algorithm>
+#include <fstream>
+#include <iostream>
 #include <vector>
 
 #define GLM_FORCE_RADIANS
@@ -227,6 +229,40 @@ public:
 	size_t get_base_point_count() const
 	{
 		return base_points.size();
+	}
+
+	void save_obj(const std::string& filename = "hopf.obj")
+	{
+		// See: http://paulbourke.net/dataformats/obj/
+
+		std::ofstream file;
+		file.open(filename);
+
+		for (const auto& vertex : mesh.get_vertices())
+		{
+			file << "v " << vertex.position.x << " " << vertex.position.y << " " << vertex.position.z << "\n";
+		}
+
+		bool start = true;
+		for (size_t i = 0; i < mesh.get_indices().size(); ++i)
+		{
+			if (start)
+			{
+				file << "l ";
+				start = false;
+			}
+
+			if (mesh.get_indices()[i] == 65535)
+			{
+				file << "\n";
+				start = true;
+				continue;
+			}
+
+			file << mesh.get_indices()[i] + 1 << " ";
+		}
+
+		file.close();
 	}
 
 private:
