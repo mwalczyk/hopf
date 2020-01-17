@@ -135,12 +135,13 @@ public:
 	void set_base_points(const std::vector<Vertex>& updated_base_points)
 	{
 		base_points = updated_base_points;
-		mesh.set_vertices(updated_base_points);
+		
+		generate_fibration(300);
 	}
 
 	void generate_fibration(size_t iterations_per_fiber)
 	{
-		auto phis = linear_spacing(0.0f, glm::two_pi<float>(), iterations_per_fiber);
+		auto phis = utils::linear_spacing(0.0f, glm::two_pi<float>(), iterations_per_fiber);
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
 
@@ -197,7 +198,7 @@ public:
 			}
 
 			// Primitive restart
-			indices.push_back(65535);
+			indices.push_back(std::numeric_limits<uint32_t>::max());
 		}
 
 		mesh = Mesh{ vertices, indices };
@@ -229,40 +230,6 @@ public:
 	size_t get_base_point_count() const
 	{
 		return base_points.size();
-	}
-
-	void save_obj(const std::string& filename = "hopf.obj")
-	{
-		// See: http://paulbourke.net/dataformats/obj/
-
-		std::ofstream file;
-		file.open(filename);
-
-		for (const auto& vertex : mesh.get_vertices())
-		{
-			file << "v " << vertex.position.x << " " << vertex.position.y << " " << vertex.position.z << "\n";
-		}
-
-		bool start = true;
-		for (size_t i = 0; i < mesh.get_indices().size(); ++i)
-		{
-			if (start)
-			{
-				file << "l ";
-				start = false;
-			}
-
-			if (mesh.get_indices()[i] == 65535)
-			{
-				file << "\n";
-				start = true;
-				continue;
-			}
-
-			file << mesh.get_indices()[i] + 1 << " ";
-		}
-
-		file.close();
 	}
 
 private:

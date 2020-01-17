@@ -7,13 +7,22 @@
 
 #include "vertex.h"
 
+struct DrawCommand
+{
+    uint32_t mode;              // Probably GL_TRIANGLES
+    uint32_t count;             // Number of elements to be rendered
+    uint32_t type;              // Probably GL_UNSIGNED_BYTE
+    uint32_t indices;           // A pointer to the location where the indices are stored
+    uint32_t base_vertex;       // A constant that should be added to each element of `indices` when choosing elements from the enabled vertex arrays
+    uint32_t base_instance;     // The base instance for use in fetching instanced vertex attributes
+};
 
 class Mesh 
 {
 
 public:
 
-    static Mesh from_sphere(float radius, const glm::vec3& center, size_t u_divisions, size_t v_divisions)
+    static std::pair<std::vector<Vertex>, std::vector<uint32_t>> from_sphere(float radius, const glm::vec3& center, size_t u_divisions, size_t v_divisions)
     {
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
@@ -58,10 +67,10 @@ public:
             indices.push_back(i + 1);
         }
     
-        return Mesh{ vertices, indices };
+        return { vertices, indices };
     }
 
-    static Mesh from_grid(float width, float height, const glm::vec3& center = glm::vec3{ 0.0f }, size_t u_subdivisions = 10, size_t v_subdivisions = 10)
+    static std::pair<std::vector<Vertex>, std::vector<uint32_t>> from_grid(float width, float height, const glm::vec3& center = glm::vec3{ 0.0f }, size_t u_subdivisions = 10, size_t v_subdivisions = 10)
     {
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
@@ -128,10 +137,10 @@ public:
             }
         }
 
-        return Mesh{ vertices, indices };
+        return { vertices, indices };
     }
 
-    static Mesh from_coordinate_frame(float size, const glm::vec3& center = glm::vec3{ 0.0f })
+    static std::pair<std::vector<Vertex>, std::vector<uint32_t>> from_coordinate_frame(float size, const glm::vec3& center = glm::vec3{ 0.0f })
     {
         std::vector<Vertex> vertices = {
             // X-axis
@@ -169,39 +178,51 @@ public:
             0, 1, 2, 3, 4, 5, 6
         };
 
-        return Mesh{ vertices, indices };
+        return { vertices, indices };
     }
 
-    Mesh()
-    {
-        glCreateVertexArrays(1, &vao);
-        glCreateBuffers(1, &vbo);
-        glCreateBuffers(1, &ibo);
-    }
+    Mesh() = default;
 
     Mesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices) :
         vertices{ vertices },
-        indices{ indices },
-        has_indices{ indices.size() > 0 }
+        indices{ indices }
     {
         setup();
     }
 
     ~Mesh() 
     {
-        // Clean-up OpenGL object
-
-        // TODO: for some reason, this causes objects not to be drawn?
-        //glDeleteVertexArrays(1, &vao);
-        //glDeleteBuffers(1, &vbo);
-        //glDeleteBuffers(1, &ibo);
+        // Clean-up OpenGL objects
+        glDeleteVertexArrays(1, &vao);
+        glDeleteBuffers(1, &vbo);
+        glDeleteBuffers(1, &ibo);
     }
+
+    Mesh& operator=(Mesh&& other) noexcept
+    {
+        // Grab the other mesh's OpenGL handles
+        std::swap(vao, other.vao);
+        std::swap(vbo, other.vbo);
+        std::swap(ibo, other.ibo);
+
+        // Reset the other mesh's OpenGL handles
+        other.vao = 0;
+        other.vbo = 0;
+        other.ibo = 0;
+
+        vertices = std::move(other.vertices);
+        indices = std::move(other.indices);
+
+        return *this;
+    }
+
+    Mesh& operator=(const Mesh& other) = delete;
 
     void draw(uint32_t mode = GL_TRIANGLES) const
     {
         glBindVertexArray(vao);
 
-        if (has_indices)
+        if (!indices.empty())
         {
             glDrawElements(mode, indices.size(), GL_UNSIGNED_INT, 0);
         }
@@ -229,12 +250,26 @@ public:
         }
         else
         {
-            
             glNamedBufferSubData(vbo, 0, sizeof(Vertex) * updated_vertices.size(), updated_vertices.data());
             vertices = updated_vertices;
-        }
+        }   
+    }
 
-       
+    void set_indices(const std::vector<uint32_t>& updated_indices)
+    {
+        if (indices.size() < updated_indices.size())
+        {
+            indices = updated_indices;
+            glDeleteVertexArrays(1, &vao);
+            glDeleteBuffers(1, &vbo);
+            glDeleteBuffers(1, &ibo);
+            setup();
+        }
+        else
+        {
+            glNamedBufferSubData(vbo, 0, sizeof(Vertex) * updated_indices.size(), updated_indices.data());
+            indices = updated_indices;
+        }
     }
 
     size_t get_vertex_count() const
@@ -259,44 +294,47 @@ public:
 
 private:
 
-    bool has_indices = false;
-
     uint32_t vao;
     uint32_t vbo;
     uint32_t ibo;
 
+    // We shouldn't need to hold onto these CPU-side, but for convenience, we keep them here for now
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
 
     void setup()
     {
-        // Create OpenGL objects
-        glCreateVertexArrays(1, &vao);
-        glCreateBuffers(1, &vbo);
-        glCreateBuffers(1, &ibo);
-
+        // Load data into the vertex buffer
+        if (vertices.empty())
         {
-            // Load data into the vertex buffer
+            // This should never happen
+            vbo = 0;
+        }
+        else
+        {   
+            glCreateBuffers(1, &vbo);
             glNamedBufferStorage(vbo, sizeof(Vertex) * vertices.size(), &vertices[0], GL_DYNAMIC_STORAGE_BIT);
-
-            if (has_indices)
-            {
-                // Load data into the index buffer
-                glNamedBufferStorage(ibo, sizeof(uint32_t) * indices.size(), &indices[0], GL_DYNAMIC_STORAGE_BIT);
-            }
         }
 
+        // Load data into the index buffer
+        if (indices.empty())
         {
-            // Associate VBO and IBO with the mesh's VAO
+            ibo = 0;
+        }
+        else
+        {
+            glCreateBuffers(1, &ibo);
+            glNamedBufferStorage(ibo, sizeof(uint32_t) * indices.size(), &indices[0], GL_DYNAMIC_STORAGE_BIT);
+        }
+        
+        // Set up the VAO and attributes
+        glCreateVertexArrays(1, &vao);
+
+        if (vbo)
+        {
+            // All vertex attributes will be sourced from a single buffer
             glVertexArrayVertexBuffer(vao, 0, vbo, 0, sizeof(Vertex));
 
-            if (has_indices)
-            {
-                glVertexArrayElementBuffer(vao, ibo);
-            }
-        }
-
-        {
             glEnableVertexArrayAttrib(vao, 0);
             glEnableVertexArrayAttrib(vao, 1);
             glEnableVertexArrayAttrib(vao, 2);
@@ -309,5 +347,12 @@ private:
             glVertexArrayAttribBinding(vao, 1, 0);
             glVertexArrayAttribBinding(vao, 2, 0);
         }
+        if (ibo)
+        {
+            glVertexArrayElementBuffer(vao, ibo);
+        }
+
+        // TODO: build draw command
+        // ...
     }
 };

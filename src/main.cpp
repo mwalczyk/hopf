@@ -206,7 +206,7 @@ std::vector<Vertex> calculate_base_points_great_circle(const glm::mat4& transfor
         const float offset = offsets[i];
         const float arc_angle = arc_angles[i];
 
-        const auto thetas = linear_spacing(0.0f, arc_angle, number_of_fibers);
+        const auto thetas = utils::linear_spacing(0.0f, arc_angle, number_of_fibers);
 
         for (const auto theta : thetas)
         {
@@ -260,7 +260,7 @@ std::vector<Vertex> calculate_base_points_loxodrome(const glm::mat4& transform =
     std::vector<Vertex> base_points;
 
     // Don't go all the way to `pi / 2` because there are discontinuities at the poles
-    auto thetas = linear_spacing(-glm::pi<float>() * 0.45f, glm::pi<float>() * 0.45f, number_of_fibers);
+    auto thetas = utils::linear_spacing(-glm::pi<float>() * 0.45f, glm::pi<float>() * 0.45f, number_of_fibers);
 
     for (size_t i = 0; i < number_of_fibers; ++i)
     {
@@ -280,6 +280,71 @@ std::vector<Vertex> calculate_base_points_loxodrome(const glm::mat4& transform =
     }
 
     return base_points;
+}
+
+std::pair<std::vector<Vertex>, std::vector<uint32_t>> generate_fibration(const std::vector<Vertex>& base_points, size_t iterations_per_fiber = 300)
+{
+    auto phis = utils::linear_spacing(0.0f, glm::two_pi<float>(), iterations_per_fiber);
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+
+    for (size_t i = 0; i < base_points.size(); ++i)
+    {
+        // Grab the current base point on S2
+        const auto point = base_points[i];
+        const float a = point.position.x;
+        const float b = point.position.y;
+        const float c = point.position.z;
+
+        const float coeff = 1.0f / sqrtf(2.0f * (1.0f + c));
+
+        // Every `iterations_per_fiber` points (in 4-space) form a single fiber of the Hopf fibration
+        for (size_t j = 0; j < iterations_per_fiber; ++j)
+        {
+            const float phi = phis[j];
+
+            // Points in 4-space: a rotation by the quaternion <x, y, z, w> would send the
+            // point <0, 0, 1> on S2 to the point <a, b, c> - thus, each base point sweeps
+            // out a great circle ("fiber") on S2
+            const float theta = atan2f(-a, b) - phi;
+            const float alpha = sqrtf((1.0f + c) / 2.0f);
+            const float beta = sqrtf((1.0f - c) / 2.0f);
+
+            const float	w = alpha * cosf(theta);
+            const float	x = alpha * sinf(theta);
+            const float	y = beta * cosf(phi);
+            const float	z = beta * sinf(phi);
+
+            // Modified stereographic projection onto the unit ball in 3-space from:
+            // https://nilesjohnson.net/hopf-production.html
+            const float r = acosf(w) / glm::pi<float>();
+            const float projection = r / sqrtf(1.0f - w * w);
+
+            Vertex vertex;
+            vertex.position = glm::vec3{
+                projection * x,
+                projection * y,
+                projection * z
+            };
+            vertex.color = glm::vec3{
+                a * 0.5f + 0.5f,
+                b * 0.5f + 0.5f,
+                c * 0.5f + 0.5f
+            };
+            vertex.texture_coordinate = glm::vec2{
+                0.0f, // Unused, at the moment
+                0.0f
+            };
+
+            vertices.push_back(vertex);
+            indices.push_back(j + iterations_per_fiber * i);
+        }
+
+        // Primitive restart
+        indices.push_back(std::numeric_limits<uint32_t>::max());
+    }
+
+    return { vertices, indices };
 }
 
 int main()
@@ -331,7 +396,7 @@ int main()
         
         // Primitive restart (for drawing all fibers via a single VBO)
         glEnable(GL_PRIMITIVE_RESTART);
-        glPrimitiveRestartIndex(65535);
+        glPrimitiveRestartIndex(std::numeric_limits<uint32_t>::max());
 
         // Program point size (for setting base point draw size in the vertex shader)
         glEnable(GL_PROGRAM_POINT_SIZE);
@@ -353,12 +418,17 @@ int main()
     auto shader_ui = Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
     
     std::vector<Vertex> base_points = calculate_base_points_great_circle();
-    auto mesh_base_points = Mesh{ base_points, { /* No indices */ } };
-    auto hopf = Hopf{ base_points };
+    auto hopf_data = generate_fibration(base_points);
+    Mesh mesh_base_points{ base_points, { /* No indices */ } };
+    Mesh mesh_hopf{ hopf_data.first, hopf_data.second };
 
-    auto mesh_sphere = Mesh::from_sphere(0.75f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
-    auto mesh_grid = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -0.6f, 0.0f });
-    auto mesh_coordinate_frame = Mesh::from_coordinate_frame(10.f);
+    auto sphere_data = Mesh::from_sphere(0.75f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
+    auto grid_data = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -0.6f, 0.0f });
+    auto coordinate_frame_data = Mesh::from_coordinate_frame(10.f);
+
+    Mesh mesh_sphere{ sphere_data.first, sphere_data.second };
+    Mesh mesh_grid{ grid_data.first, grid_data.second };
+    Mesh mesh_coordinate_frame{ coordinate_frame_data.first, coordinate_frame_data.second };
 
     // Create the framebuffer that we will render the S2 sphere into
     uint32_t framebuffer_ui;
@@ -411,7 +481,7 @@ int main()
 
                 // Global settings (shared across modes)
                 ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Primary Controls");
-                topology_needs_update |= ImGui::SliderInt("Number of Fibers", (int*)&number_of_fibers, 10, 400);
+                topology_needs_update |= ImGui::SliderInt("Number of Fibers", (int*)&number_of_fibers, 1, 400);
 
                 if (ImGui::BeginCombo("Mode", current_mode.c_str())) 
                 {
@@ -443,8 +513,8 @@ int main()
                     // Resize radii / arc angle vectors if the user has changed the number of circles
                     if (number_of_circles_changed)
                     {
-                        offsets = linear_spacing(0.0f, -0.9f, number_of_circles);
-                        arc_angles = linear_spacing((glm::two_pi<float>()) * 0.25f, glm::two_pi<float>() * 0.75f, number_of_circles);
+                        offsets = utils::linear_spacing(0.0f, -0.9f, number_of_circles);
+                        arc_angles = utils::linear_spacing((glm::two_pi<float>()) * 0.25f, glm::two_pi<float>() * 0.75f, number_of_circles);
                     }
 
                     // Draw per-circle sliders with a different color
@@ -476,7 +546,7 @@ int main()
 
                 // Global rotation applied to all base points in every mode
                 ImGui::Separator();
-                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Rotations (Applied to All Fibers)");
+                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Rotations (Applied to Points)");
                 topology_needs_update |= ImGui::SliderFloat("Rotation X", &rotation_x, 0.0f, glm::pi<float>());
                 topology_needs_update |= ImGui::SliderFloat("Rotation Y", &rotation_y, 0.0f, glm::pi<float>());
                 topology_needs_update |= ImGui::SliderFloat("Rotation Z", &rotation_z, 0.0f, glm::pi<float>());
@@ -487,7 +557,7 @@ int main()
                 ImGui::SameLine();
                 if (ImGui::Button("Export"))
                 {
-                    hopf.save_obj(filename);
+                    utils::save_polyline_obj(mesh_hopf, filename);
                 }
                 ImGui::ColorEdit3("Background Color", (float*)&clear_color);
                 ImGui::Checkbox("Show Floor Plane", &show_floor_plane);
@@ -530,7 +600,11 @@ int main()
 
             mesh_base_points.set_vertices(base_points);
 
-            hopf = Hopf{ base_points };
+            hopf_data = generate_fibration(base_points);
+            mesh_hopf = Mesh{ hopf_data.first, hopf_data.second };
+           // mesh_hopf.set_vertices(hopf_data.first);
+          //  mesh_hopf.set_indices(hopf_data.second);
+           // hopf = Hopf{ base_points };
         }
 
         // Render 3D objects to UI (offscreen) framebuffer
@@ -599,7 +673,15 @@ int main()
             shader_hopf.uniform_mat4("u_view", arcball_camera_matrix);
 
             shader_hopf.uniform_mat4("u_model", arcball_model_matrix);
-            hopf.draw(draw_as_points);
+
+            if (draw_as_points)
+            {
+                mesh_hopf.draw(GL_POINTS);
+            }
+            else
+            {
+                mesh_hopf.draw(GL_LINE_LOOP);
+            }
 
             if (show_floor_plane)
             {
