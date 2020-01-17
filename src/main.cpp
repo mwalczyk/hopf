@@ -9,7 +9,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#include "hopf.h"
+#include "mesh.h"
 #include "shader.h"
 #include "utils.h"
 
@@ -34,9 +34,9 @@ float last_y;
 glm::mat4 arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 1.0f, 0.0f }, glm::vec3{ 0.0f }, glm::vec3{ 1.0f, 1.0f, 0.0f });
 glm::mat4 arcball_model_matrix = glm::mat4{ 1.0f };
 
-
 // Global settings
 size_t number_of_fibers = 100;
+size_t iterations_per_fiber = 300;
 const std::vector<std::string> modes = { "Great Circle", "Random", "Loxodrome" };
 std::string current_mode = modes[0];
 
@@ -63,14 +63,14 @@ InputData input_data;
 /**
  * A function for handling key presses.
  */
-void process_input(GLFWwindow* window)
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
     {
+        // Close the GLFW window
         glfwSetWindowShouldClose(window, true);
     }
-
-    if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
+    if (key == GLFW_KEY_H && action == GLFW_PRESS)
     {
         // Reset the arcball camera
         arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 1.0f, 0.0f }, glm::vec3{ 0.0f }, glm::vec3{ 1.0f, 1.0f, 0.0f });
@@ -321,6 +321,7 @@ std::pair<std::vector<Vertex>, std::vector<uint32_t>> generate_fibration(const s
             const float projection = r / sqrtf(1.0f - w * w);
 
             Vertex vertex;
+
             vertex.position = glm::vec3{
                 projection * x,
                 projection * y,
@@ -364,6 +365,7 @@ int main()
         exit(EXIT_FAILURE);
     }
     glfwMakeContextCurrent(window);
+    glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetWindowUserPointer(window, &input_data);
 
@@ -413,24 +415,24 @@ int main()
         glCullFace(GL_BACK);
     }
 
-    // Load shaders, meshes, etc.
+    // Load shader programs
     auto shader_hopf = Shader{ "../shaders/hopf.vert", "../shaders/hopf.frag" };
     auto shader_ui = Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
     
+    // Generate initial base points on S2 as well as other mesh primitives
     std::vector<Vertex> base_points = calculate_base_points_great_circle();
-    auto hopf_data = generate_fibration(base_points);
-    Mesh mesh_base_points{ base_points, { /* No indices */ } };
-    Mesh mesh_hopf{ hopf_data.first, hopf_data.second };
-
+    auto hopf_data = generate_fibration(base_points, iterations_per_fiber);
     auto sphere_data = Mesh::from_sphere(0.75f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
-    auto grid_data = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -0.6f, 0.0f });
+    auto grid_data = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -0.8f, 0.0f });
     auto coordinate_frame_data = Mesh::from_coordinate_frame(10.f);
 
+    Mesh mesh_base_points{ base_points, { /* No indices */ } };
+    Mesh mesh_hopf{ hopf_data.first, hopf_data.second };
     Mesh mesh_sphere{ sphere_data.first, sphere_data.second };
     Mesh mesh_grid{ grid_data.first, grid_data.second };
     Mesh mesh_coordinate_frame{ coordinate_frame_data.first, coordinate_frame_data.second };
 
-    // Create the framebuffer that we will render the S2 sphere into
+    // Create the offscreen framebuffer that we will render the S2 sphere into
     uint32_t framebuffer_ui;
     uint32_t texture_color_attachment_ui;
     uint32_t renderbuffer_ui;
@@ -464,7 +466,6 @@ int main()
 
         // Poll regular GLFW window events
         glfwPollEvents();
-        process_input(window);
 
         // This flag will be set to `true` by the various UI elements if the settings have changed
         // in such a way as to warrant a recalculation of the fibration topology 
@@ -482,13 +483,13 @@ int main()
                 // Global settings (shared across modes)
                 ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Primary Controls");
                 topology_needs_update |= ImGui::SliderInt("Number of Fibers", (int*)&number_of_fibers, 1, 400);
-
+                topology_needs_update |= ImGui::SliderInt("Iterations per Fibers", (int*)&iterations_per_fiber, 10, 500);
+                ImGui::Text("Total Vertices: %d", number_of_fibers * iterations_per_fiber);
                 if (ImGui::BeginCombo("Mode", current_mode.c_str())) 
                 {
-                    for (size_t i = 0; i < modes.size(); i++)
+                    for (size_t i = 0; i < modes.size(); ++i)
                     {
                         bool is_selected = current_mode.c_str() == modes[i];
-
                         if (ImGui::Selectable(modes[i].c_str(), is_selected))
                         {
                             topology_needs_update |= true;
@@ -501,6 +502,7 @@ int main()
                     }
                     ImGui::EndCombo();
                 }
+
                 ImGui::Separator();
 
                 // Per-mode UI settings
@@ -544,15 +546,25 @@ int main()
                     topology_needs_update |= ImGui::SliderFloat("Loxodrome Offset", &loxodrome_offset, 2.0f, 20.0f);
                 }
 
-                // Global rotation applied to all base points in every mode
                 ImGui::Separator();
+
+                // Global rotation applied to all base points in every mode
                 ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Rotations (Applied to Points)");
                 topology_needs_update |= ImGui::SliderFloat("Rotation X", &rotation_x, 0.0f, glm::pi<float>());
                 topology_needs_update |= ImGui::SliderFloat("Rotation Y", &rotation_y, 0.0f, glm::pi<float>());
                 topology_needs_update |= ImGui::SliderFloat("Rotation Z", &rotation_z, 0.0f, glm::pi<float>());
 
-                ImGui::Separator();
-                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Appearance");
+                ImGui::End();
+            }
+            // Container #2: preview UI
+            {
+                ImGui::Begin("Mapping (Points on S2)");
+                ImGui::Image((void*)(intptr_t)texture_color_attachment_ui, ImVec2(ui_w, ui_h));
+                ImGui::End();
+            }
+            // Container #3: appearance and export
+            {
+                ImGui::Begin("Appearance and Export");
                 ImGui::InputText("", filename, 64);
                 ImGui::SameLine();
                 if (ImGui::Button("Export"))
@@ -562,14 +574,12 @@ int main()
                 ImGui::ColorEdit3("Background Color", (float*)&clear_color);
                 ImGui::Checkbox("Show Floor Plane", &show_floor_plane);
                 ImGui::Checkbox("Draw as Points (Instead of Lines)", &draw_as_points);
+
                 ImGui::Separator();
+
+                // Some statistics about framerate, etc.
                 ImGui::Text("Application Average %.3f MS/Frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-                ImGui::End();
-            }
-            // Container #2: preview UI
-            {
-                ImGui::Begin("Mapping (Points on S2)");
-                ImGui::Image((void*)(intptr_t)texture_color_attachment_ui, ImVec2(ui_w, ui_h));
+
                 ImGui::End();
             }
         }
@@ -597,14 +607,10 @@ int main()
             {
                 base_points = calculate_base_points_loxodrome(model);
             }
+            hopf_data = generate_fibration(base_points, iterations_per_fiber);
 
             mesh_base_points.set_vertices(base_points);
-
-            hopf_data = generate_fibration(base_points);
             mesh_hopf = Mesh{ hopf_data.first, hopf_data.second };
-           // mesh_hopf.set_vertices(hopf_data.first);
-          //  mesh_hopf.set_indices(hopf_data.second);
-           // hopf = Hopf{ base_points };
         }
 
         // Render 3D objects to UI (offscreen) framebuffer
