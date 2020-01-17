@@ -37,7 +37,7 @@ glm::mat4 arcball_model_matrix = glm::mat4{ 1.0f };
 // Global settings
 size_t number_of_fibers = 100;
 size_t iterations_per_fiber = 300;
-const std::vector<std::string> modes = { "Great Circle", "Random", "Loxodrome" };
+const std::vector<std::string> modes = { "Great Circle", "Random", "Loxodrome", "Curl" };
 std::string current_mode = modes[0];
 
 // Per-mode settings
@@ -51,6 +51,8 @@ uint32_t seed = 0.0f;                                       // For mode: "Random
 float mean = 0.0f;                                          // For mode: "Random"
 float standard_deviation = 1.0f;                            // For mode: "Random"
 float loxodrome_offset = 2.0f;                              // For mode: "Loxodrome"
+float curl_alpha = 4.0f;                                    // For mode: "Curl"                         
+float curl_beta = 0.5f;                                     // For mode: "Curl"
 
 // Appearance
 static char filename[64] = "Hopf.obj";
@@ -264,7 +266,6 @@ std::vector<Vertex> calculate_base_points_loxodrome(const glm::mat4& transform =
 
     for (size_t i = 0; i < number_of_fibers; ++i)
     {
-       
         const float radius = 1.0f;
         
         const float x = radius * cosf(thetas[i]) * cosf(thetas[i] * loxodrome_offset);
@@ -273,6 +274,41 @@ std::vector<Vertex> calculate_base_points_loxodrome(const glm::mat4& transform =
 
         Vertex vertex;
         vertex.position = glm::vec3{ transform * glm::vec4{ x, y, z, 1.0f } };
+        vertex.color = vertex.position * 0.5f + 0.5f;
+        vertex.texture_coordinate = { 0.0f, 0.0f };
+
+        base_points.push_back(vertex);
+    }
+
+    return base_points;
+}
+
+std::vector<Vertex> calculate_base_points_curl(const glm::mat4& transform = glm::mat4{ 1.0f })
+{
+    std::vector<Vertex> base_points;
+
+    auto thetas = utils::linear_spacing(0.0f, glm::two_pi<float>(), number_of_fibers);
+
+    for (size_t i = 0; i < number_of_fibers; ++i)
+    {
+        const float theta = thetas[i];
+        const float radius = 1.0f;
+
+        float coeff_x = sinf(theta * curl_alpha) * curl_beta;
+        float coeff_y = cosf(theta * curl_alpha) * curl_beta;
+
+        float x = radius * coeff_x + cosf(theta);
+        float y = radius * coeff_y + sinf(theta);
+        float z = 0.0f;
+
+        // Stereographic projection onto a sphere
+        Vertex vertex;
+        vertex.position = glm::vec3{ transform * glm::vec4{ 
+            (2.0f * x) / (1.0f + x * x + y * y),
+            (2.0f * y) / (1.0f + x * x + y * y),
+            (-1.0f + x * x + y * y) / (1.0f + x * x + y * y),
+            1.0f 
+        } };
         vertex.color = vertex.position * 0.5f + 0.5f;
         vertex.texture_coordinate = { 0.0f, 0.0f };
 
@@ -545,6 +581,11 @@ int main()
                 {
                     topology_needs_update |= ImGui::SliderFloat("Loxodrome Offset", &loxodrome_offset, 2.0f, 20.0f);
                 }
+                else if (current_mode == "Curl")
+                {
+                    topology_needs_update |= ImGui::SliderFloat("Curl Alpha", &curl_alpha, 4.0f, 10.0f);
+                    topology_needs_update |= ImGui::SliderFloat("Curl Beta", &curl_beta, 0.0f, 1.0f);
+                }
 
                 ImGui::Separator();
 
@@ -606,6 +647,10 @@ int main()
             else if (current_mode == "Loxodrome")
             {
                 base_points = calculate_base_points_loxodrome(model);
+            }
+            else if (current_mode == "Curl")
+            {
+                base_points = calculate_base_points_curl(model);
             }
             hopf_data = generate_fibration(base_points, iterations_per_fiber);
 
