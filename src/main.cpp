@@ -33,6 +33,7 @@ const uint32_t ui_h = 256;
 bool first_mouse = true;
 float last_x;
 float last_y;
+float zoom = 45.0f;
 glm::mat4 arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 1.0f, 0.0f }, glm::vec3{ 0.0f }, glm::vec3{ 1.0f, 1.0f, 0.0f });
 glm::mat4 arcball_model_matrix = glm::mat4{ 1.0f };
 
@@ -67,6 +68,25 @@ float line_width = 2.0f;
 InputData input_data;
 
 /**
+ * A function for handling scrolling.
+ */
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    if (zoom >= 1.0f && zoom <= 45.0f)
+    {
+        zoom -= yoffset;
+    }
+    if (zoom <= 1.0f)
+    {
+        zoom = 1.0f;
+    }
+    if (zoom >= 45.0f)
+    {
+        zoom = 45.0f;
+    }
+}
+
+/**
  * A function for handling key presses.
  */
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -79,7 +99,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_H && action == GLFW_PRESS)
     {
         // Reset the arcball camera
-        arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 1.0f, 0.0f }, glm::vec3{ 0.0f }, glm::vec3{ 1.0f, 1.0f, 0.0f });
+        arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 0.0f, 0.0f }, glm::vec3{ 0.0f }, glm::vec3{ 1.0f, 1.0f, 0.0f });
         arcball_model_matrix = glm::mat4{ 1.0f };
     }
 }
@@ -405,6 +425,7 @@ int main()
         exit(EXIT_FAILURE);
     }
     glfwMakeContextCurrent(window);
+    glfwSetScrollCallback(window, scroll_callback);
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetWindowUserPointer(window, &input_data);
@@ -782,7 +803,7 @@ int main()
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 glm::mat4 projection = glm::perspective(
-                    glm::radians(45.0f),
+                    glm::radians(zoom),
                     static_cast<float>(window_w) / static_cast<float>(window_h),
                     0.1f,
                     1000.0f
