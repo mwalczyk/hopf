@@ -1,5 +1,6 @@
 #version 460
 
+uniform mat4 u_light_space_matrix;
 uniform float u_time;
 
 uniform mat4 u_projection;
@@ -10,25 +11,18 @@ layout(location = 0) in vec3 i_position;
 layout(location = 1) in vec3 i_color;
 layout(location = 2) in vec2 i_texture_coordinates;
 
-out vec3 vs_color;
-
-mat4 rotation(vec3 axis, float angle)
+out VS_OUT
 {
-    axis = normalize(axis);
-    float s = sin(angle);
-    float c = cos(angle);
-    float oc = 1.0 - c;
-    
-    return mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
-                oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
-                oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
-                0.0,                                0.0,                                0.0,                                1.0);
-}
+    vec3 color;
+    vec4 light_space_position;
+} vs_out;
+
 
 void main() 
 {
     gl_PointSize = 4.0;
     gl_Position = u_projection * u_view * u_model * vec4(i_position, 1.0);
 
-    vs_color = i_color;
+    vs_out.color = i_color;
+    vs_out.light_space_position = u_light_space_matrix * u_model * vec4(i_position, 1.0);
 }

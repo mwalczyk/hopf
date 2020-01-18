@@ -1,18 +1,19 @@
 #version 460
 
-uniform bool u_alpha;
-
 layout(location = 0) out vec4 o_color;
 
 in VS_OUT
 {
     vec3 color;
+    vec3 position;
 } fs_in;
 
 void main() 
 {	
-	//vec2 point_coordinates = gl_PointCoord - vec2(0.5);
-	//if(length(point_coordinates) > 0.5) discard;
+	// Calculate some very simple lighting for the central sphere and point cloud
+	const vec3 light_position = vec3(2.0, 2.0, 3.0);
+    const vec3 normal = normalize(fs_in.position);
+    float intensity = max(0.75, clamp(dot(normal, light_position), 0.0, 1.0));
 
-	o_color = vec4(fs_in.color, u_alpha ? 0.5 : 1.0);
+	o_color = vec4(fs_in.color * intensity, 1.0);
 }

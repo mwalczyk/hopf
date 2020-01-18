@@ -26,6 +26,8 @@ struct InputData
 // Viewport and camera details
 const uint32_t window_w = 1080;
 const uint32_t window_h = 1080;
+const uint32_t depth_w = window_w * 2;
+const uint32_t depth_h = window_h * 2;
 const uint32_t ui_w = 256;
 const uint32_t ui_h = 256;
 bool first_mouse = true;
@@ -59,6 +61,8 @@ static char filename[64] = "Hopf.obj";
 ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);   
 bool show_floor_plane = true;
 bool draw_as_points = false;
+bool display_shadows = true;
+float line_width = 2.0f;
 
 InputData input_data;
 
@@ -439,19 +443,17 @@ int main()
         // Program point size (for setting base point draw size in the vertex shader)
         glEnable(GL_PROGRAM_POINT_SIZE);
 
-        // Line width for the fibers
-        glLineWidth(2.0f);
-
         // Alpha blending for the sphere UI
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         // Backface culling for optimization
-        glEnable(GL_CULL_FACE);
+       // glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
     }
 
     // Load shader programs
+    auto shader_depth = Shader{ "../shaders/depth.vert", "../shaders/depth.frag" };
     auto shader_hopf = Shader{ "../shaders/hopf.vert", "../shaders/hopf.frag" };
     auto shader_ui = Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
     
@@ -459,8 +461,8 @@ int main()
     std::vector<Vertex> base_points = calculate_base_points_great_circle();
     auto hopf_data = generate_fibration(base_points, iterations_per_fiber);
     auto sphere_data = Mesh::from_sphere(0.75f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
-    auto grid_data = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -0.8f, 0.0f });
-    auto coordinate_frame_data = Mesh::from_coordinate_frame(10.f);
+    auto grid_data = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -1.0f, 0.0f });
+    auto coordinate_frame_data = Mesh::from_coordinate_frame(0.75f, glm::vec3{ -2.0f, -2.0f, -2.0f });
 
     Mesh mesh_base_points{ base_points, { /* No indices */ } };
     Mesh mesh_hopf{ hopf_data.first, hopf_data.second };
@@ -470,17 +472,17 @@ int main()
 
     // Create the offscreen framebuffer that we will render the S2 sphere into
     uint32_t framebuffer_ui;
-    uint32_t texture_color_attachment_ui;
+    uint32_t texture_ui;
     uint32_t renderbuffer_ui;
     {
         glCreateFramebuffers(1, &framebuffer_ui);
 
         // Create a color attachment texture and associate it with the framebuffer
-        glCreateTextures(GL_TEXTURE_2D, 1, &texture_color_attachment_ui);
-        glTextureStorage2D(texture_color_attachment_ui, 1, GL_RGBA8, window_w, window_h);
-        glTextureParameteri(texture_color_attachment_ui, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTextureParameteri(texture_color_attachment_ui, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glNamedFramebufferTexture(framebuffer_ui, GL_COLOR_ATTACHMENT0, texture_color_attachment_ui, 0);
+        glCreateTextures(GL_TEXTURE_2D, 1, &texture_ui);
+        glTextureStorage2D(texture_ui, 1, GL_RGBA8, window_w, window_h);
+        glTextureParameteri(texture_ui, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTextureParameteri(texture_ui, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glNamedFramebufferTexture(framebuffer_ui, GL_COLOR_ATTACHMENT0, texture_ui, 0);
 
         // Create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
         glCreateRenderbuffers(1, &renderbuffer_ui);
@@ -490,6 +492,33 @@ int main()
 
         // Now that we actually created the framebuffer and added all attachments we want to check if it is actually complete 
         if (glCheckNamedFramebufferStatus(framebuffer_ui, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        {
+            std::cerr << "Error: framebuffer is not complete\n";
+        }
+    }
+    
+    // Create the offscreen framebuffer that we will render depth into (for shadow mapping)
+    uint32_t framebuffer_depth;
+    uint32_t texture_depth;
+    {
+        glCreateFramebuffers(1, &framebuffer_depth);
+
+        // Create a color attachment texture and associate it with the framebuffer
+        const float border[] = { 1.0, 1.0, 1.0, 1.0 };
+        glCreateTextures(GL_TEXTURE_2D, 1, &texture_depth);
+        glTextureStorage2D(texture_depth, 1, GL_DEPTH_COMPONENT32F, depth_w, depth_h);
+        glTextureParameteri(texture_depth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTextureParameteri(texture_depth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTextureParameteri(texture_depth, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTextureParameteri(texture_depth, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        glTextureParameterfv(texture_depth, GL_TEXTURE_BORDER_COLOR, border);
+        glNamedFramebufferTexture(framebuffer_depth, GL_DEPTH_ATTACHMENT, texture_depth, 0);
+        
+        glNamedFramebufferDrawBuffer(framebuffer_depth, GL_NONE);
+        glNamedFramebufferReadBuffer(framebuffer_depth, GL_NONE);
+
+        // Now that we actually created the framebuffer and added all attachments we want to check if it is actually complete 
+        if (glCheckNamedFramebufferStatus(framebuffer_depth, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         {
             std::cerr << "Error: framebuffer is not complete\n";
         }
@@ -600,7 +629,8 @@ int main()
             // Container #2: preview UI
             {
                 ImGui::Begin("Mapping (Points on S2)");
-                ImGui::Image((void*)(intptr_t)texture_color_attachment_ui, ImVec2(ui_w, ui_h));
+                ImGui::Image((void*)(intptr_t)texture_ui, ImVec2(ui_w, ui_h), ImVec2(1, 1), ImVec2(0, 0));
+                //ImGui::Image((void*)(intptr_t)texture_depth, ImVec2(ui_w, ui_h), ImVec2(1, 1), ImVec2(0, 0), ImVec4(1.0, 0.4, 1.0, 1.0));
                 ImGui::End();
             }
             // Container #3: appearance and export
@@ -615,6 +645,8 @@ int main()
                 ImGui::ColorEdit3("Background Color", (float*)&clear_color);
                 ImGui::Checkbox("Show Floor Plane", &show_floor_plane);
                 ImGui::Checkbox("Draw as Points (Instead of Lines)", &draw_as_points);
+                ImGui::Checkbox("Display Shadows", &display_shadows);
+                ImGui::SliderFloat("Line Width", &line_width, 1.0f, 10.0f);
 
                 ImGui::Separator();
 
@@ -660,9 +692,9 @@ int main()
 
         // Render 3D objects to UI (offscreen) framebuffer
         {
-            glViewport(0, 0, window_w, window_h);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            glLineWidth(4.0f);
 
+            glViewport(0, 0, window_w, window_h);
             glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_ui);
 
             const float clear_color_values[] = { 0.1f, 0.1f, 0.1f, 1.0f };
@@ -690,14 +722,12 @@ int main()
             shader_ui.uniform_mat4("u_view", view);
 
             shader_ui.uniform_mat4("u_model", model);
-            shader_ui.uniform_bool("u_alpha", false);
             mesh_base_points.draw(GL_POINTS);
 
             shader_ui.uniform_mat4("u_model", glm::mat4{ 1.0f });
             mesh_coordinate_frame.draw(GL_LINES);
 
             shader_ui.uniform_mat4("u_model", glm::mat4{ 1.0f });
-            shader_ui.uniform_bool("u_alpha", true);
             mesh_sphere.draw();
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -705,39 +735,85 @@ int main()
 
         // Render 3D objects to default framebuffer
         {
-            glViewport(0, 0, window_w, window_h);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            // Set the line width, as the fibration will be drawn as line segments
+            glLineWidth(line_width);
+         
+            glm::vec3 light_position{ -2.0f, 2.0f, 2.0f };
+            const float near_plane = 0.0f;
+            const float far_plane = 7.5f;
+            const float ortho_width = 2.0f;
+            const auto light_projection = glm::ortho(-ortho_width, ortho_width, -ortho_width, ortho_width, near_plane, far_plane);
+            const auto light_view = glm::lookAt(light_position, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+            const auto light_space_matrix = light_projection * light_view;
 
-            glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            glm::mat4 projection = glm::perspective(
-                glm::radians(45.0f),
-                static_cast<float>(window_w) / static_cast<float>(window_h),
-                0.1f,
-                1000.0f
-            );
-
-            shader_hopf.use();
-            shader_hopf.uniform_float("u_time", glfwGetTime());
-            shader_hopf.uniform_mat4("u_projection", projection);
-            shader_hopf.uniform_mat4("u_view", arcball_camera_matrix);
-
-            shader_hopf.uniform_mat4("u_model", arcball_model_matrix);
-
-            if (draw_as_points)
+            // Render pass #1: render depth
             {
-                mesh_hopf.draw(GL_POINTS);
+                glViewport(0, 0, depth_w, depth_h);
+                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_depth);
+
+                // Clear the depth attachment (there are no color attachments)
+                const float clear_depth_value = 1.0f;
+                glClearNamedFramebufferfv(framebuffer_depth, GL_DEPTH, 0, &clear_depth_value);
+
+                shader_depth.use();
+                shader_depth.uniform_mat4("u_light_space_matrix", light_space_matrix);
+
+                shader_depth.uniform_mat4("u_model", arcball_model_matrix);
+                if (draw_as_points)
+                {
+                    mesh_hopf.draw(GL_POINTS);
+                }
+                else
+                {
+                    mesh_hopf.draw(GL_LINE_LOOP);
+                }
+
+                if (show_floor_plane)
+                {
+                    shader_depth.uniform_mat4("u_model", glm::mat4{ 1.0f });
+                    mesh_grid.draw();
+                }
+
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
             }
-            else
+            
+            // Render pass #2: draw scene with shadows
             {
-                mesh_hopf.draw(GL_LINE_LOOP);
-            }
+                glViewport(0, 0, window_w, window_h);
 
-            if (show_floor_plane)
-            {
-                shader_hopf.uniform_mat4("u_model", glm::mat4{ 1.0f });
-                mesh_grid.draw();
+                glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+                glm::mat4 projection = glm::perspective(
+                    glm::radians(45.0f),
+                    static_cast<float>(window_w) / static_cast<float>(window_h),
+                    0.1f,
+                    1000.0f
+                );
+
+                shader_hopf.use();
+                shader_hopf.uniform_texture(0, texture_depth);
+                shader_hopf.uniform_bool("u_display_shadows", display_shadows);
+                shader_hopf.uniform_mat4("u_light_space_matrix", light_space_matrix);
+                shader_hopf.uniform_float("u_time", glfwGetTime());
+                shader_hopf.uniform_mat4("u_projection", projection);
+                shader_hopf.uniform_mat4("u_view", arcball_camera_matrix);
+
+                shader_hopf.uniform_mat4("u_model", arcball_model_matrix);
+                if (draw_as_points)
+                {
+                    mesh_hopf.draw(GL_POINTS);
+                }
+                else
+                {
+                    mesh_hopf.draw(GL_LINE_LOOP);
+                }
+
+                if (show_floor_plane)
+                {
+                    shader_hopf.uniform_mat4("u_model", glm::mat4{ 1.0f });
+                    mesh_grid.draw();
+                }
             }
         }
 

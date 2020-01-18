@@ -56,5 +56,7 @@ The three different modes are shown below:
 ## Credits
 This project was largely inspired by and based on previous work done by [Dr. Niles Johnson](https://nilesjohnson.net/), who teaches at Ohio State University. In particular, I used his parameterization of the fibers, as outlined in his [production](https://nilesjohnson.net/hopf-production.html) notes. His animated videos of the Hopf fibration are what motivated me to delve into this topic.
 
+The shadow mapping code (and many other OpenGL tips) were largely adapted from [learnopengl.com](https://learnopengl.com), an amazing resource for anyone trying to learn more about the OpenGL API and computer graphics.
+
 ### License
 [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/)

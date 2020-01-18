@@ -44,6 +44,11 @@ public:
         glUseProgram(program_id);
     }
 
+    void uniform_texture(uint32_t unit, uint32_t texture_handle)
+    {
+        glBindTextureUnit(unit, texture_handle);
+    }
+
     void uniform_bool(const std::string& name, bool value) const
     {
         glUniform1i(glGetUniformLocation(program_id, name.c_str()), (int)value);
