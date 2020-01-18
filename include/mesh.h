@@ -17,12 +17,14 @@ struct DrawCommand
     uint32_t base_instance;     // The base instance for use in fetching instanced vertex attributes
 };
 
+using MeshData = std::pair<std::vector<Vertex>, std::vector<uint32_t>>;
+
 class Mesh 
 {
 
 public:
 
-    static std::pair<std::vector<Vertex>, std::vector<uint32_t>> from_sphere(float radius, const glm::vec3& center, size_t u_divisions, size_t v_divisions)
+    static MeshData from_sphere(float radius, const glm::vec3& center, size_t u_divisions, size_t v_divisions)
     {
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
@@ -70,7 +72,7 @@ public:
         return { vertices, indices };
     }
 
-    static std::pair<std::vector<Vertex>, std::vector<uint32_t>> from_grid(float width, float height, const glm::vec3& center = glm::vec3{ 0.0f }, size_t u_subdivisions = 10, size_t v_subdivisions = 10)
+    static MeshData from_grid(float width, float height, const glm::vec3& center = glm::vec3{ 0.0f }, size_t u_subdivisions = 10, size_t v_subdivisions = 10)
     {
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
@@ -140,7 +142,7 @@ public:
         return { vertices, indices };
     }
 
-    static std::pair<std::vector<Vertex>, std::vector<uint32_t>> from_coordinate_frame(float size, const glm::vec3& center = glm::vec3{ 0.0f })
+    static MeshData from_coordinate_frame(float size, const glm::vec3& center = glm::vec3{ 0.0f })
     {
         std::vector<Vertex> vertices = {
             // X-axis
@@ -200,15 +202,12 @@ public:
 
     Mesh& operator=(Mesh&& other) noexcept
     {
+        std::cout << "Move assignment called\n";
+
         // Grab the other mesh's OpenGL handles
         std::swap(vao, other.vao);
         std::swap(vbo, other.vbo);
         std::swap(ibo, other.ibo);
-
-        // Reset the other mesh's OpenGL handles
-        other.vao = 0;
-        other.vbo = 0;
-        other.ibo = 0;
 
         vertices = std::move(other.vertices);
         indices = std::move(other.indices);

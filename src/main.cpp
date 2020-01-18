@@ -432,7 +432,6 @@ int main()
         glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(message_callback, nullptr);
 #endif
-
         // Depth testing
         glEnable(GL_DEPTH_TEST);
         
@@ -448,7 +447,7 @@ int main()
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         // Backface culling for optimization
-       // glEnable(GL_CULL_FACE);
+        glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
     }
 
@@ -630,7 +629,6 @@ int main()
             {
                 ImGui::Begin("Mapping (Points on S2)");
                 ImGui::Image((void*)(intptr_t)texture_ui, ImVec2(ui_w, ui_h), ImVec2(1, 1), ImVec2(0, 0));
-                //ImGui::Image((void*)(intptr_t)texture_depth, ImVec2(ui_w, ui_h), ImVec2(1, 1), ImVec2(0, 0), ImVec4(1.0, 0.4, 1.0, 1.0));
                 ImGui::End();
             }
             // Container #3: appearance and export
@@ -735,7 +733,6 @@ int main()
 
         // Render 3D objects to default framebuffer
         {
-            // Set the line width, as the fibration will be drawn as line segments
             glLineWidth(line_width);
          
             glm::vec3 light_position{ -2.0f, 2.0f, 2.0f };
