@@ -16,7 +16,7 @@ namespace utils
 		return data;
 	}
 
-	void save_polyline_obj(const Mesh& mesh, std::string filename = "model.obj")
+	void save_polyline_obj(const graphics::Mesh& mesh, std::string filename = "model.obj")
 	{
 		// See: http://paulbourke.net/dataformats/obj/
 

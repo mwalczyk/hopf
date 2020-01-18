@@ -452,22 +452,22 @@ int main()
     }
 
     // Load shader programs
-    auto shader_depth = Shader{ "../shaders/depth.vert", "../shaders/depth.frag" };
-    auto shader_hopf = Shader{ "../shaders/hopf.vert", "../shaders/hopf.frag" };
-    auto shader_ui = Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
+    auto shader_depth = graphics::Shader{ "../shaders/depth.vert", "../shaders/depth.frag" };
+    auto shader_hopf = graphics::Shader{ "../shaders/hopf.vert", "../shaders/hopf.frag" };
+    auto shader_ui = graphics::Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
     
     // Generate initial base points on S2 as well as other mesh primitives
     std::vector<Vertex> base_points = calculate_base_points_great_circle();
     auto hopf_data = generate_fibration(base_points, iterations_per_fiber);
-    auto sphere_data = Mesh::from_sphere(0.75f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
-    auto grid_data = Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -1.0f, 0.0f });
-    auto coordinate_frame_data = Mesh::from_coordinate_frame(0.75f, glm::vec3{ -2.0f, -2.0f, -2.0f });
+    auto sphere_data = graphics::Mesh::from_sphere(0.75f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
+    auto grid_data = graphics::Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -1.0f, 0.0f });
+    auto coordinate_frame_data = graphics::Mesh::from_coordinate_frame(0.75f, glm::vec3{ -2.0f, -2.0f, -2.0f });
 
-    Mesh mesh_base_points{ base_points, { /* No indices */ } };
-    Mesh mesh_hopf{ hopf_data.first, hopf_data.second };
-    Mesh mesh_sphere{ sphere_data.first, sphere_data.second };
-    Mesh mesh_grid{ grid_data.first, grid_data.second };
-    Mesh mesh_coordinate_frame{ coordinate_frame_data.first, coordinate_frame_data.second };
+    graphics::Mesh mesh_base_points{ base_points, { /* No indices */ } };
+    graphics::Mesh mesh_hopf{ hopf_data.first, hopf_data.second };
+    graphics::Mesh mesh_sphere{ sphere_data.first, sphere_data.second };
+    graphics::Mesh mesh_grid{ grid_data.first, grid_data.second };
+    graphics::Mesh mesh_coordinate_frame{ coordinate_frame_data.first, coordinate_frame_data.second };
 
     // Create the offscreen framebuffer that we will render the S2 sphere into
     uint32_t framebuffer_ui;
@@ -685,7 +685,7 @@ int main()
             hopf_data = generate_fibration(base_points, iterations_per_fiber);
 
             mesh_base_points.set_vertices(base_points);
-            mesh_hopf = Mesh{ hopf_data.first, hopf_data.second };
+            mesh_hopf = graphics::Mesh{ hopf_data.first, hopf_data.second };
         }
 
         // Render 3D objects to UI (offscreen) framebuffer

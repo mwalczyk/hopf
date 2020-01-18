@@ -28,7 +28,7 @@ void main()
 		// Filtering
 		const float bias = 0.005;
 		const vec2 texel_size = 1.0 / textureSize(u_depth_map, 0);
-		const int kernel_steps = 1;
+		const int kernel_steps = 3;
 		for(int x = -kernel_steps; x <= kernel_steps; ++x)
 		{
 		    for(int y = -kernel_steps; y <= kernel_steps; ++y)
