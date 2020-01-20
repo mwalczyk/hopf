@@ -18,8 +18,6 @@ To actually visualize the fibers of the Hopf fibration, we use a [stereographic 
 
 <p align="center">
   <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/stereographic_s2.png" alt="screenshot" width="200" height="auto"/>
-</p>
-<p align="center">
   <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/stereographic_s3.png" alt="screenshot" width="200" height="auto"/>
 </p>
 
