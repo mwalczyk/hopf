@@ -16,6 +16,10 @@ For example, let `p` be the principal point such that `p = p0`. The fiber corres
 
 To actually visualize the fibers of the Hopf fibration, we use a [stereographic projection](https://en.wikipedia.org/wiki/Stereographic_projection) that projects points in 4-space into 3-space. Because each fiber is a circle embedded in 4-space (as explained above), its stereographic projection will similarly be a circle in 3-space.
 
+<p align="center">
+  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/curl.gif" alt="screenshot" width="400" height="auto"/>
+</p>
+
 ## Tested On
 - Windows 10
 - NVIDIA GeForce GTX 1660 Ti
