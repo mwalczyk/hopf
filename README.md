@@ -14,10 +14,13 @@ To be more specific, the mapping treats each point on the surface of S3 `<a, b, 
 
 For example, let `p` be the principal point such that `p = p0`. The fiber corresponding to `p` is the set of all unit quaternions `<cos(t), sin(t), 0, 0>` for any scalar value `t`. Each of these quaternions, when applied to `p0`, result in `p0` itself. So the question becomes: given *any* point `p` on S2, how do we find the set of all quaternions that rotate the principal point to `p` (i.e. the fiber on S3 that corresponds to `p`)? 
 
-To actually visualize the fibers of the Hopf fibration, we use a [stereographic projection](https://en.wikipedia.org/wiki/Stereographic_projection) that projects points in 4-space into 3-space. Because each fiber is a circle embedded in 4-space (as explained above), its stereographic projection will similarly be a circle in 3-space.
+To actually visualize the fibers of the Hopf fibration, we use a [stereographic projection](https://en.wikipedia.org/wiki/Stereographic_projection) that projects points in 4-space into 3-space. Because each fiber is a circle embedded in 4-space (as explained above), its stereographic projection will similarly be a circle in 3-space. For reference, the stereographic projection of S2 and S3 are shown side-by-side below.
 
 <p align="center">
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/curl.gif" alt="screenshot" width="400" height="auto"/>
+  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/stereographic_s2.png" alt="screenshot" width="200" height="auto"/>
+</p>
+<p align="center">
+  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/stereographic_s3.png" alt="screenshot" width="200" height="auto"/>
 </p>
 
 ## Tested On
@@ -42,6 +45,11 @@ cmake ..
 4. Build and run the project
 
 ## To Use
+
+<p align="center">
+  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/curl.gif" alt="screenshot" width="400" height="auto"/>
+</p>
+
 Upon launching the application, you should see three separate UI panels labeled:
 
 - `Hopf Fibration`: contains all of the primary controls, mode selection, etc.
