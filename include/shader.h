@@ -11,6 +11,12 @@
 namespace graphics
 {
 
+    struct UniformEntry
+    {
+        uint32_t location;
+        uint32_t count;
+    };
+
     class Shader
     {
     public:
@@ -112,6 +118,7 @@ namespace graphics
     private:
 
         uint32_t program_id;
+        std::unordered_map<std::string, UniformEntry> uniforms;
 
         uint32_t compile_shader_module(const std::string& path, uint32_t type)
         {
@@ -177,32 +184,26 @@ namespace graphics
 
         void perform_reflection()
         {
-            struct uniform_info_t
-            {
-                GLint location;
-                GLsizei count;
-            };
-
             GLint uniform_count = 0;
             glGetProgramiv(program_id, GL_ACTIVE_UNIFORMS, &uniform_count);
 
             if (uniform_count != 0)
             {
-                GLint 	max_name_len = 0;
+                GLint max_name_len = 0;
                 GLsizei length = 0;
                 GLsizei count = 0;
-                GLenum 	type = GL_NONE;
+                GLenum type = GL_NONE;
                 glGetProgramiv(program_id, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_len);
 
                 auto uniform_name = std::make_unique<char[]>(max_name_len);
 
-                std::unordered_map<std::string, uniform_info_t> uniforms;
+                std::unordered_map<std::string, UniformEntry> uniforms;
 
-                for (GLint i = 0; i < uniform_count; ++i)
+                for (size_t i = 0; i < uniform_count; ++i)
                 {
                     glGetActiveUniform(program_id, i, max_name_len, &length, &count, &type, uniform_name.get());
 
-                    uniform_info_t uniform_info = {};
+                    UniformEntry uniform_info = {};
                     uniform_info.location = glGetUniformLocation(program_id, uniform_name.get());
                     uniform_info.count = count;
 

@@ -23,7 +23,7 @@ struct InputData
     bool imgui_active = false;
 };
 
-// Viewport and camera details
+// Viewport and camera settings
 const uint32_t window_w = 1080;
 const uint32_t window_h = 1080;
 const uint32_t depth_w = window_w * 2;
@@ -38,10 +38,10 @@ glm::mat4 arcball_camera_matrix = glm::lookAt(glm::vec3{ 6.0f, 1.0f, 0.0f }, glm
 glm::mat4 arcball_model_matrix = glm::mat4{ 1.0f };
 
 // Global settings
-size_t number_of_fibers = 100;
+size_t number_of_fibers = 200;
 size_t iterations_per_fiber = 300;
 const std::vector<std::string> modes = { "Great Circle", "Random", "Loxodrome", "Curl" };
-std::string current_mode = modes[0];
+std::string current_mode = modes[3];
 
 // Per-mode settings
 uint32_t number_of_circles = 1;                             // For mode: "Great Circle"
@@ -50,14 +50,14 @@ std::vector<float> arc_angles = { glm::two_pi<float>() };   // For mode: "Great 
 float rotation_x = 0.0f;                                    // For mode: "Great Circle"
 float rotation_y = 0.0f;                                    // For mode: "Great Circle"
 float rotation_z = 0.0f;                                    // For mode: "Great Circle"
-uint32_t seed = 0.0f;                                       // For mode: "Random"
+uint32_t seed = 0;                                          // For mode: "Random"
 float mean = 0.0f;                                          // For mode: "Random"
 float standard_deviation = 1.0f;                            // For mode: "Random"
 float loxodrome_offset = 2.0f;                              // For mode: "Loxodrome"
 float curl_alpha = 4.0f;                                    // For mode: "Curl"                         
 float curl_beta = 0.5f;                                     // For mode: "Curl"
 
-// Appearance
+// Appearance and export settings
 static char filename[64] = "Hopf.obj";
 ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);   
 bool show_floor_plane = true;
@@ -105,35 +105,35 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 }
 
 /**
- * Get a normalized vector from the center of the virtual ball `O` to a
- * point `P` on the virtual ball surface, such that `P` is aligned on
- * screen's (X, Y) coordinates.  If (X, Y) is too far away from the
+ * Get a normalized vector from the center of a virtual sphere centered at the origin to 
+ * a point `point_on_sphere` on the virtual ball surface, such that `point_on_sphere` 
+ * is aligned on screen's (x, y) coordinates.  If (x, y) is too far away from the
  * sphere, return the nearest point on the virtual ball surface.
  */
 glm::vec3 get_arcball_vector(int x, int y) 
 {
-    glm::vec3 P = glm::vec3(
-        1.0 * x / window_w * 2.0f - 1.0f,
-        1.0 * y / window_h * 2.0f - 1.0f,
+    auto point_on_sphere = glm::vec3{
+        1.0f * x / window_w * 2.0f - 1.0f,
+        1.0f * y / window_h * 2.0f - 1.0f,
         0.0f
-    );
+    };
 
-    P.y = -P.y;
+    point_on_sphere.y = -point_on_sphere.y;
 
-    float op_squared = P.x * P.x + P.y * P.y;
+    const float op_squared = point_on_sphere.x * point_on_sphere.x + point_on_sphere.y * point_on_sphere.y;
 
     if (op_squared <= 1.0f * 1.0f)
     {
         // Pythagorean theorem
-        P.z = sqrt(1.0f * 1.0f - op_squared);  
+        point_on_sphere.z = sqrt(1.0f * 1.0f - op_squared);  
     }
     else
     {
         // Nearest point
-        P = glm::normalize(P);  
+        point_on_sphere = glm::normalize(point_on_sphere);  
     }
 
-    return P;
+    return point_on_sphere;
 }
 
 /**
@@ -223,189 +223,222 @@ void message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GL
     std::cout << src_str << ", " << type_str << ", " << severity_str << ", " << id << ": " << message << '\n';
 }
 
-std::vector<Vertex> calculate_base_points_great_circle(const glm::mat4& transform = glm::mat4{ 1.0f })
+namespace hopf
 {
-    std::vector<Vertex> base_points;
-   
-    for (size_t i = 0; i < number_of_circles; ++i)
+
+    std::vector<Vertex> calculate_base_points_great_circle(const glm::mat4& transform = glm::mat4{ 1.0f })
     {
-        const float offset = offsets[i];
-        const float arc_angle = arc_angles[i];
+        std::vector<Vertex> base_points;
 
-        const auto thetas = utils::linear_spacing(0.0f, arc_angle, number_of_fibers);
-
-        for (const auto theta : thetas)
+        for (size_t i = 0; i < number_of_circles; ++i)
         {
-            const float c = cosf(theta) * (1.0f - fabsf(offset));
-            const float s = sinf(theta) * (1.0f - fabsf(offset));
+            const float offset = offsets[i];
+            const float arc_angle = arc_angles[i];
 
-            const glm::vec3 position = glm::vec3{ transform * glm::vec4{ c, s, offset, 1.0f } };
-        
+            const auto thetas = utils::linear_spacing(0.0f, arc_angle, number_of_fibers);
+
+            for (const auto theta : thetas)
+            {
+                const float c = cosf(theta) * (1.0f - fabsf(offset));
+                const float s = sinf(theta) * (1.0f - fabsf(offset));
+
+                const glm::vec3 position = glm::vec3{ transform * glm::vec4{ c, s, offset, 1.0f } };
+
+                Vertex vertex;
+
+                vertex.position = position;
+                vertex.color = vertex.position * 0.5f + 0.5f;
+                vertex.texture_coordinate = { 0.0f, 0.0f };
+
+                base_points.push_back(vertex);
+            }
+        }
+
+        return base_points;
+    }
+
+    std::vector<Vertex> calculate_base_points_random(const glm::mat4& transform = glm::mat4{ 1.0f })
+    {
+        std::vector<Vertex> base_points;
+
+        // Create a normal (Gaussian) distribution generator
+        std::default_random_engine generator{ seed };
+        std::normal_distribution<float> distribution(mean, standard_deviation);
+
+        for (size_t i = 0; i < number_of_fibers; ++i)
+        {
+            const auto rand_x = distribution(generator);
+            const auto rand_y = distribution(generator);
+            const auto rand_z = distribution(generator);
+
+            const float radius = 1.0f;
+
             Vertex vertex;
-
-            vertex.position = position;
+            vertex.position = glm::vec3{ transform * glm::vec4{ glm::normalize(glm::vec3{ rand_x, rand_y, rand_z }) * radius, 1.0f} };
             vertex.color = vertex.position * 0.5f + 0.5f;
             vertex.texture_coordinate = { 0.0f, 0.0f };
 
             base_points.push_back(vertex);
         }
+
+        return base_points;
     }
 
-    return base_points;
-}
-
-std::vector<Vertex> calculate_base_points_random(const glm::mat4& transform = glm::mat4{ 1.0f })
-{
-    std::vector<Vertex> base_points;
-
-    // Create a normal (Gaussian) distribution generator
-    std::default_random_engine generator{ seed };
-    std::normal_distribution<float> distribution(mean, standard_deviation);
-
-    for (size_t i = 0; i < number_of_fibers; ++i)
+    std::vector<Vertex> calculate_base_points_loxodrome(const glm::mat4& transform = glm::mat4{ 1.0f })
     {
-        const auto rand_x = distribution(generator);
-        const auto rand_y = distribution(generator);
-        const auto rand_z = distribution(generator);
+        std::vector<Vertex> base_points;
 
-        const float radius = 1.0f;
+        // Don't go all the way to `pi / 2` because there are discontinuities at the poles
+        auto thetas = utils::linear_spacing(-glm::pi<float>() * 0.45f, glm::pi<float>() * 0.45f, number_of_fibers);
 
-        Vertex vertex;
-        vertex.position = glm::vec3{ transform * glm::vec4{ glm::normalize(glm::vec3{ rand_x, rand_y, rand_z }) * radius, 1.0f} };
-        vertex.color = vertex.position * 0.5f + 0.5f;
-        vertex.texture_coordinate = { 0.0f, 0.0f };
-
-        base_points.push_back(vertex);
-    }
-
-    return base_points;
-}
-
-std::vector<Vertex> calculate_base_points_loxodrome(const glm::mat4& transform = glm::mat4{ 1.0f })
-{
-    std::vector<Vertex> base_points;
-
-    // Don't go all the way to `pi / 2` because there are discontinuities at the poles
-    auto thetas = utils::linear_spacing(-glm::pi<float>() * 0.45f, glm::pi<float>() * 0.45f, number_of_fibers);
-
-    for (size_t i = 0; i < number_of_fibers; ++i)
-    {
-        const float radius = 1.0f;
-        
-        const float x = radius * cosf(thetas[i]) * cosf(thetas[i] * loxodrome_offset);
-        const float y = radius * cosf(thetas[i]) * sinf(thetas[i] * loxodrome_offset);
-        const float z = radius * sinf(thetas[i]);
-
-        Vertex vertex;
-        vertex.position = glm::vec3{ transform * glm::vec4{ x, y, z, 1.0f } };
-        vertex.color = vertex.position * 0.5f + 0.5f;
-        vertex.texture_coordinate = { 0.0f, 0.0f };
-
-        base_points.push_back(vertex);
-    }
-
-    return base_points;
-}
-
-std::vector<Vertex> calculate_base_points_curl(const glm::mat4& transform = glm::mat4{ 1.0f })
-{
-    std::vector<Vertex> base_points;
-
-    auto thetas = utils::linear_spacing(0.0f, glm::two_pi<float>(), number_of_fibers);
-
-    for (size_t i = 0; i < number_of_fibers; ++i)
-    {
-        const float theta = thetas[i];
-        const float radius = 1.0f;
-
-        float coeff_x = sinf(theta * curl_alpha) * curl_beta;
-        float coeff_y = cosf(theta * curl_alpha) * curl_beta;
-
-        float x = radius * coeff_x + cosf(theta);
-        float y = radius * coeff_y + sinf(theta);
-        float z = 0.0f;
-
-        // Stereographic projection onto a sphere
-        Vertex vertex;
-        vertex.position = glm::vec3{ transform * glm::vec4{ 
-            (2.0f * x) / (1.0f + x * x + y * y),
-            (2.0f * y) / (1.0f + x * x + y * y),
-            (-1.0f + x * x + y * y) / (1.0f + x * x + y * y),
-            1.0f 
-        } };
-        vertex.color = vertex.position * 0.5f + 0.5f;
-        vertex.texture_coordinate = { 0.0f, 0.0f };
-
-        base_points.push_back(vertex);
-    }
-
-    return base_points;
-}
-
-std::pair<std::vector<Vertex>, std::vector<uint32_t>> generate_fibration(const std::vector<Vertex>& base_points, size_t iterations_per_fiber = 300)
-{
-    auto phis = utils::linear_spacing(0.0f, glm::two_pi<float>(), iterations_per_fiber);
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
-
-    for (size_t i = 0; i < base_points.size(); ++i)
-    {
-        // Grab the current base point on S2
-        const auto point = base_points[i];
-        const float a = point.position.x;
-        const float b = point.position.y;
-        const float c = point.position.z;
-
-        const float coeff = 1.0f / sqrtf(2.0f * (1.0f + c));
-
-        // Every `iterations_per_fiber` points (in 4-space) form a single fiber of the Hopf fibration
-        for (size_t j = 0; j < iterations_per_fiber; ++j)
+        for (size_t i = 0; i < number_of_fibers; ++i)
         {
-            const float phi = phis[j];
+            const float radius = 1.0f;
 
-            // Points in 4-space: a rotation by the quaternion <x, y, z, w> would send the
-            // point <0, 0, 1> on S2 to the point <a, b, c> - thus, each base point sweeps
-            // out a great circle ("fiber") on S2
-            const float theta = atan2f(-a, b) - phi;
-            const float alpha = sqrtf((1.0f + c) / 2.0f);
-            const float beta = sqrtf((1.0f - c) / 2.0f);
-
-            const float	w = alpha * cosf(theta);
-            const float	x = alpha * sinf(theta);
-            const float	y = beta * cosf(phi);
-            const float	z = beta * sinf(phi);
-
-            // Modified stereographic projection onto the unit ball in 3-space from:
-            // https://nilesjohnson.net/hopf-production.html
-            const float r = acosf(w) / glm::pi<float>();
-            const float projection = r / sqrtf(1.0f - w * w);
+            const float x = radius * cosf(thetas[i]) * cosf(thetas[i] * loxodrome_offset);
+            const float y = radius * cosf(thetas[i]) * sinf(thetas[i] * loxodrome_offset);
+            const float z = radius * sinf(thetas[i]);
 
             Vertex vertex;
+            vertex.position = glm::vec3{ transform * glm::vec4{ x, y, z, 1.0f } };
+            vertex.color = vertex.position * 0.5f + 0.5f;
+            vertex.texture_coordinate = { 0.0f, 0.0f };
 
-            vertex.position = glm::vec3{
-                projection * x,
-                projection * y,
-                projection * z
-            };
-            vertex.color = glm::vec3{
-                a * 0.5f + 0.5f,
-                b * 0.5f + 0.5f,
-                c * 0.5f + 0.5f
-            };
-            vertex.texture_coordinate = glm::vec2{
-                0.0f, // Unused, at the moment
-                0.0f
-            };
-
-            vertices.push_back(vertex);
-            indices.push_back(j + iterations_per_fiber * i);
+            base_points.push_back(vertex);
         }
 
-        // Primitive restart
-        indices.push_back(std::numeric_limits<uint32_t>::max());
+        return base_points;
     }
 
-    return { vertices, indices };
+    std::vector<Vertex> calculate_base_points_curl(const glm::mat4& transform = glm::mat4{ 1.0f })
+    {
+        std::vector<Vertex> base_points;
+
+        auto thetas = utils::linear_spacing(0.0f, glm::two_pi<float>(), number_of_fibers);
+
+        for (size_t i = 0; i < number_of_fibers; ++i)
+        {
+            const float theta = thetas[i];
+            const float radius = 1.0f;
+
+            float coeff_x = sinf(theta * curl_alpha) * curl_beta;
+            float coeff_y = cosf(theta * curl_alpha) * curl_beta;
+
+            float x = radius * coeff_x + cosf(theta);
+            float y = radius * coeff_y + sinf(theta);
+            float z = 0.0f;
+
+            // Stereographic projection onto a sphere
+            Vertex vertex;
+            vertex.position = glm::vec3{ transform * glm::vec4{
+                (2.0f * x) / (1.0f + x * x + y * y),
+                (2.0f * y) / (1.0f + x * x + y * y),
+                (-1.0f + x * x + y * y) / (1.0f + x * x + y * y),
+                1.0f
+            } };
+            vertex.color = vertex.position * 0.5f + 0.5f;
+            vertex.texture_coordinate = { 0.0f, 0.0f };
+
+            base_points.push_back(vertex);
+        }
+
+        return base_points;
+    }
+
+    std::vector<Vertex> get_base_points(const std::string& mode, const glm::mat4& transform = glm::mat4{ 1.0f })
+    {
+        std::vector<Vertex> base_points;
+
+        if (current_mode == "Great Circle")
+        {
+            base_points = calculate_base_points_great_circle(transform);
+        }
+        else if (current_mode == "Random")
+        {
+            base_points = calculate_base_points_random(transform);
+        }
+        else if (current_mode == "Loxodrome")
+        {
+            base_points = calculate_base_points_loxodrome(transform);
+        }
+        else if (current_mode == "Curl")
+        {
+            base_points = calculate_base_points_curl(transform);
+        }
+        else
+        {
+            throw std::runtime_error("Attempting to calculate base points from unknown mode");
+        }
+
+        return base_points;
+    }
+
+    graphics::MeshData generate_fibration(const std::vector<Vertex>& base_points, size_t iterations_per_fiber = 300)
+    {
+        auto phis = utils::linear_spacing(0.0f, glm::two_pi<float>(), iterations_per_fiber);
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
+
+        for (size_t i = 0; i < base_points.size(); ++i)
+        {
+            // Grab the current base point on S2
+            const auto point = base_points[i];
+            const float a = point.position.x;
+            const float b = point.position.y;
+            const float c = point.position.z;
+
+            const float coeff = 1.0f / sqrtf(2.0f * (1.0f + c));
+
+            // Every `iterations_per_fiber` points (in 4-space) form a single fiber of the Hopf fibration
+            for (size_t j = 0; j < iterations_per_fiber; ++j)
+            {
+                const float phi = phis[j];
+
+                // Points in 4-space: a rotation by the quaternion <x, y, z, w> would send the
+                // point <0, 0, 1> on S2 to the point <a, b, c> - thus, each base point sweeps
+                // out a great circle ("fiber") on S2
+                const float theta = atan2f(-a, b) - phi;
+                const float alpha = sqrtf((1.0f + c) / 2.0f);
+                const float beta = sqrtf((1.0f - c) / 2.0f);
+
+                const float	w = alpha * cosf(theta);
+                const float	x = alpha * sinf(theta);
+                const float	y = beta * cosf(phi);
+                const float	z = beta * sinf(phi);
+
+                // Modified stereographic projection onto the unit ball in 3-space from:
+                // https://nilesjohnson.net/hopf-production.html
+                const float r = acosf(w) / glm::pi<float>();
+                const float projection = r / sqrtf(1.0f - w * w);
+
+                Vertex vertex;
+
+                vertex.position = glm::vec3{
+                    projection * x,
+                    projection * y,
+                    projection * z
+                };
+                vertex.color = glm::vec3{
+                    a * 0.5f + 0.5f,
+                    b * 0.5f + 0.5f,
+                    c * 0.5f + 0.5f
+                };
+                vertex.texture_coordinate = glm::vec2{
+                    0.0f, // Unused, at the moment
+                    0.0f
+                };
+
+                vertices.push_back(vertex);
+                indices.push_back(j + iterations_per_fiber * i);
+            }
+
+            // Primitive restart
+            indices.push_back(std::numeric_limits<uint32_t>::max());
+        }
+
+        return { vertices, indices };
+    }
+
 }
 
 int main()
@@ -418,12 +451,14 @@ int main()
     glfwWindowHint(GLFW_RESIZABLE, false);
     glfwWindowHint(GLFW_SAMPLES, 4);
     GLFWwindow* window = glfwCreateWindow(window_w, window_h, "Hopf Fibration", nullptr, nullptr);
+
     if (window == nullptr)
     {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
+
     glfwMakeContextCurrent(window);
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetKeyCallback(window, key_callback);
@@ -478,8 +513,8 @@ int main()
     auto shader_ui = graphics::Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
     
     // Generate initial base points on S2 as well as other mesh primitives
-    std::vector<Vertex> base_points = calculate_base_points_great_circle();
-    auto hopf_data = generate_fibration(base_points, iterations_per_fiber);
+    std::vector<Vertex> base_points = hopf::get_base_points(current_mode);
+    auto hopf_data = hopf::generate_fibration(base_points, iterations_per_fiber);
     auto sphere_data = graphics::Mesh::from_sphere(0.75f, glm::vec3{ 0.0f, 0.0f, 0.0f }, 20, 20);
     auto grid_data = graphics::Mesh::from_grid(2.0f, 2.0f, glm::vec3{ 0.0f, -1.0f, 0.0f });
     auto coordinate_frame_data = graphics::Mesh::from_coordinate_frame(0.75f, glm::vec3{ -2.0f, -2.0f, -2.0f });
@@ -567,7 +602,7 @@ int main()
 
                 // Global settings (shared across modes)
                 ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Primary Controls");
-                topology_needs_update |= ImGui::SliderInt("Number of Fibers", (int*)&number_of_fibers, 1, 400);
+                topology_needs_update |= ImGui::SliderInt("Number of Fibers", (int*)&number_of_fibers, 1, 1000);
                 topology_needs_update |= ImGui::SliderInt("Iterations per Fibers", (int*)&iterations_per_fiber, 10, 500);
                 ImGui::Text("Total Vertices: %d", number_of_fibers * iterations_per_fiber);
                 if (ImGui::BeginCombo("Mode", current_mode.c_str())) 
@@ -639,7 +674,7 @@ int main()
                 ImGui::Separator();
 
                 // Global rotation applied to all base points in every mode
-                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Rotations (Applied to Points)");
+                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram), "Rotations - Euler Angles (Applied to Points)");
                 topology_needs_update |= ImGui::SliderFloat("Rotation X", &rotation_x, 0.0f, glm::pi<float>());
                 topology_needs_update |= ImGui::SliderFloat("Rotation Y", &rotation_y, 0.0f, glm::pi<float>());
                 topology_needs_update |= ImGui::SliderFloat("Rotation Z", &rotation_z, 0.0f, glm::pi<float>());
@@ -678,32 +713,15 @@ int main()
         ImGui::Render();
 
         // The transformation matrix that will be applied to the base points on S2 to generate the fibration
-        glm::mat4 model{ 1.0f };
-        model = glm::rotate(model, rotation_x, glm::vec3{ 1.0f, 0.0f, 0.0f });
-        model = glm::rotate(model, rotation_y, glm::vec3{ 0.0f, 1.0f, 0.0f });
-        model = glm::rotate(model, rotation_z, glm::vec3{ 0.0f, 0.0f, 1.0f });
+        glm::mat4 ui_rotation_matrix{ 1.0f };
+        ui_rotation_matrix = glm::rotate(ui_rotation_matrix, rotation_x, glm::vec3{ 1.0f, 0.0f, 0.0f });
+        ui_rotation_matrix = glm::rotate(ui_rotation_matrix, rotation_y, glm::vec3{ 0.0f, 1.0f, 0.0f });
+        ui_rotation_matrix = glm::rotate(ui_rotation_matrix, rotation_z, glm::vec3{ 0.0f, 0.0f, 1.0f });
 
         if (topology_needs_update)
         {
-            std::vector<Vertex> base_points;
-
-            if (current_mode == "Great Circle")
-            {
-                base_points = calculate_base_points_great_circle(model);
-            }
-            else if (current_mode == "Random")
-            {
-                base_points = calculate_base_points_random(model);
-            }
-            else if (current_mode == "Loxodrome")
-            {
-                base_points = calculate_base_points_loxodrome(model);
-            }
-            else if (current_mode == "Curl")
-            {
-                base_points = calculate_base_points_curl(model);
-            }
-            hopf_data = generate_fibration(base_points, iterations_per_fiber);
+            std::vector<Vertex> base_points = hopf::get_base_points(current_mode, ui_rotation_matrix);
+            hopf_data = hopf::generate_fibration(base_points, iterations_per_fiber);
 
             mesh_base_points.set_vertices(base_points);
             mesh_hopf = graphics::Mesh{ hopf_data.first, hopf_data.second };
@@ -740,7 +758,7 @@ int main()
             shader_ui.uniform_mat4("u_projection", projection);
             shader_ui.uniform_mat4("u_view", view);
 
-            shader_ui.uniform_mat4("u_model", model);
+            shader_ui.uniform_mat4("u_model", ui_rotation_matrix);
             mesh_base_points.draw(GL_POINTS);
 
             shader_ui.uniform_mat4("u_model", glm::mat4{ 1.0f });
