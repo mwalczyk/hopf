@@ -6,11 +6,15 @@
 </p>
 
 ## Description
-The Hopf fibration is a mapping from S3 to S2 discovered by Heinz Hopf in 1931. Confusingly, S3 actually refers to the sphere (or hypersphere) in 4D space. Similarly, S2 refers to the sphere that we are most familiar with in 3D space. To quote Wikipedia: "Hopf found a many-to-one continuous function (or 'map') from the 3-sphere onto the 2-sphere such that each distinct point of the 2-sphere is mapped to from a distinct great circle of the 3-sphere."
+The Hopf fibration is a mapping from S3 to S2 discovered by Heinz Hopf in 1931. Confusingly (at least for me), S3 actually refers to the sphere (or hypersphere) in 4D space. Similarly, S2 refers to the sphere that we are most familiar with in 3D space. To quote Wikipedia: "Hopf found a many-to-one continuous function (or 'map') from the 3-sphere onto the 2-sphere such that each distinct point of the 2-sphere is mapped to from a distinct great circle of the 3-sphere."
 
-A "great circle" is essentially a planar "slice" of a sphere that passes through its center. It is difficult to visualize what a great circle on the surface of a 4-dimensional sphere looks like, but luckily, we don't have to. Each of these great circles in the domain of the mapping function forms a "fiber" that we can project down to 3-space. Doing so results in a beautiful structure of nested shapes that appear to be intricately woven together.
+The first thing to understand is that a [great circle](https://en.wikipedia.org/wiki/Great_circle) is essentially a "slice" of a sphere that passes through its center. It is difficult to visualize what a great circle on the surface of a 4-dimensional sphere looks like, but luckily, we don't have to. Each of these great circles in the domain of the mapping function forms a "fiber" that we can project down to 3-space. Doing so results in a beautiful structure of nested shapes that appear to be intricately woven together.
 
-How does the mapping work?
+To be more specific, the mapping treats each point on the surface of S3 `<a, b, c, d>` as a unit quaternion `r = a + b*i + c*j + d*k` (a unit quaternion is one whose norm is 1). Next, we pick a "principal point" on S2: in the literature, this is usually a unit vector along one of the standard basis vectors, i.e. `<1, 0, 0>`. The fiber for any point `p` on S2 consists of all of the unit quaternions that send the principal point `p0` to `p`, via a rotation in 3-space. 
+
+For example, let `p` be the principal point such that `p = p0`. The fiber corresponding to `p` is the set of all unit quaternions `<cos(t), sin(t), 0, 0>` for any scalar value `t`. Each of these quaternions, when applied to `p0`, result in `p0` itself. So the question becomes: given *any* point `p` on S2, how do we find the set of all quaternions that rotate the principal point to `p` (i.e. the fiber on S3 that corresponds to `p`)? 
+
+To actually visualize the fibers of the Hopf fibration, we use a [stereographic projection](https://en.wikipedia.org/wiki/Stereographic_projection) that projects points in 4-space into 3-space. Because each fiber is a circle embedded in 4-space (as explained above), its stereographic projection will similarly be a circle in 3-space.
 
 ## Tested On
 - Windows 10
