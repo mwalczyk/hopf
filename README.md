@@ -50,18 +50,18 @@ cmake ..
 
 Upon launching the application, you should see three separate UI panels labeled:
 
-- `Hopf Fibration`: contains all of the primary controls, mode selection, etc.
-- `Mapping (Points on S2)`: visualizes the current codomain (see notes below)
-- `Appearance and Export`: contains some basic settings for adjusting the appearance of the model as well as a button for .obj export
+- **Hopf Fibration**: contains controls for adjusting the number of fibers, mode selection, etc.
+- **Mapping (Points on S2)**: renders the active base points on the surface of a sphere in 3-space
+- **Appearance and Export**: contains some basic settings for adjusting the appearance of the model as well as a button for exporting the model as an .obj file
 
-Within the panel labeled `Hopf Fibration`, there are several "mapping modes" available, each of which corresponds to a (configurable) set of points on the surface of S2 that form the codomain of the mapping:
+Within the panel labeled "Hopf Fibration", there are several "mapping modes" available, each of which corresponds to a (configurable) set of points on S2 that form the codomain of the mapping:
 
-- `Great Circle`: sets the codomain to the set of points formed by one or more great circles on the surfaces of S2
-- `Random`: sets the codomain to a randomly distributed set of points on the surface of S2
-- `Loxodrome`: sets the codomain to a [Rhumb line](https://en.wikipedia.org/wiki/Rhumb_line) (spiral arc) on the surface of S2
-- `Curl`: sets the codomain to a curled, floral pattern on the surface of S2
+- **Great Circle**: sets the codomain to the set of points formed by one or more great circles on the surfaces of S2
+- **Random**: sets the codomain to a randomly distributed set of points on the surface of S2
+- **Loxodrome**: sets the codomain to a [Rhumb line](https://en.wikipedia.org/wiki/Rhumb_line) (spiral arc) on the surface of S2
+- **Curl**: sets the codomain to a curled, floral pattern on the surface of S2
 
-The four different modes are shown below:
+Each mode has a specific set of parameters that can be adjusted on-the-fly for changing the fibration. Example images from the four different modes are shown below:
 
 <p align="center">
   <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/mode_great_circle.png" alt="screenshot" width="200" height="auto"/>
