@@ -13,10 +13,6 @@
 #include "shader.h"
 #include "utils.h"
 
-// References:
-// [1](https://github.com/fendevel/Guide-to-Modern-OpenGL-Functions#glframebuffer)
-// [2](https://en.wikibooks.org/wiki/OpenGL_Programming/Modern_OpenGL_Tutorial_Arcball)
-
 // Data that will be associated with the GLFW window
 struct InputData
 {

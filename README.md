@@ -86,6 +86,8 @@ Other resources that were helpful during the creation of this project:
 - [Explanation of Quaternions by Ken Shoemake](https://nilesjohnson.net/hopf-articles/Shoemake_quatut.pdf)
 - [A Young Person's Guide to the Hopf Fibration](https://arxiv.org/abs/0908.1205)
 - [An Elementary Introduction to the Hopf Fibration](https://nilesjohnson.net/hopf-articles/Lyons_Elem-intro-Hopf-fibration.pdf)
+- [Arcball Cameras](https://en.wikibooks.org/wiki/OpenGL_Programming/Modern_OpenGL_Tutorial_Arcball)
+- [Guide to Modern OpenGL Functions (DSA)](https://github.com/fendevel/Guide-to-Modern-OpenGL-Functions)
 
 The shadow mapping code (and many other OpenGL tips) were largely adapted from [learnopengl.com](https://learnopengl.com), an amazing resource for anyone trying to learn more about the OpenGL API and computer graphics.
 
