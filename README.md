@@ -1,4 +1,4 @@
-# hopf
+# Hopf
 🧣 A graphical program for exploring the Hopf fibration.
 
 <p align="center">
