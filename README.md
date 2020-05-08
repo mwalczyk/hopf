@@ -2,7 +2,7 @@
 🧣 A graphical program for exploring the Hopf fibration.
 
 <p align="center">
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/fibration.png" alt="screenshot" width="400" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/hopf/master/screenshots/fibration.png" alt="screenshot" width="400" height="auto"/>
 </p>
 
 ## Description
@@ -17,8 +17,8 @@ For example, let `p` be the principal point such that `p = p0`. The fiber corres
 To actually visualize the fibers of the Hopf fibration, we use a [stereographic projection](https://en.wikipedia.org/wiki/Stereographic_projection) that projects points in 4-space into 3-space. Because each fiber is a circle embedded in 4-space (as explained above), its stereographic projection will similarly be a circle in 3-space. For reference, the stereographic projection of S2 and S3 are shown side-by-side below.
 
 <p align="center">
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/stereographic_s2.png" alt="screenshot" width="200" height="auto"/>
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/stereographic_s3.png" alt="screenshot" width="200" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/hopf/master/screenshots/stereographic_s2.png" alt="screenshot" width="200" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/hopf/master/screenshots/stereographic_s3.png" alt="screenshot" width="200" height="auto"/>
 </p>
 
 ## Tested On
@@ -45,7 +45,7 @@ cmake ..
 ## To Use
 
 <p align="center">
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/curl.gif" alt="screenshot" width="400" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/hopf/master/screenshots/curl.gif" alt="screenshot" width="400" height="auto"/>
 </p>
 
 Upon launching the application, you should see three separate UI panels labeled:
@@ -64,10 +64,10 @@ Within the panel labeled "Hopf Fibration", there are several "mapping modes" ava
 Each mode has a specific set of parameters that can be adjusted on-the-fly for changing the fibration. Example images from the four different modes are shown below:
 
 <p align="center">
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/mode_great_circle.png" alt="screenshot" width="200" height="auto"/>
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/mode_random.png" alt="screenshot" width="200" height="auto"/>
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/mode_loxodrome.png" alt="screenshot" width="200" height="auto"/>
-  <img src="https://github.com/mwalczyk/hopf/blob/master/screenshots/mode_curl.png" alt="screenshot" width="200" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/hopf/master/screenshots/mode_great_circle.png" alt="screenshot" width="200" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/hopf/master/screenshots/mode_random.png" alt="screenshot" width="200" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/hopf/master/screenshots/mode_loxodrome.png" alt="screenshot" width="200" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/hopf/master/screenshots/mode_curl.png" alt="screenshot" width="200" height="auto"/>
 </p>
 
 You can use your mouse to rotate the model in space. You can zoom in or out with your scroll wheel. Finally, you can "home" (i.e. reset) the current view by pressing `h` on your keyboard.
